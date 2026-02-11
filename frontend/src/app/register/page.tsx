@@ -109,7 +109,7 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="flex items-center gap-4 text-sm text-muted">
-                    <span>© 2024 SubTrack</span>
+                    <span>© 2026 SubTrack</span>
                 </div>
             </div>
 
