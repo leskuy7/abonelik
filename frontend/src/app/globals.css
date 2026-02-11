@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+:root {
+  --notification-background: #020617;
+  --notification-foreground: #f8fafc;
+
+  /* Semantic Colors - Dark Default */
+  --bg-default: #020617;
+  --bg-card: #0f172a;
+  --bg-input: #020617;
+  --text-default: #f8fafc;
+  --text-muted: #94a3b8;
+  --border-default: #1e293b;
+  --primary: #9333ea;
+  --primary-fg: #ffffff;
+
+  /* Scrollbar */
+  --scrollbar-track: #1e293b;
+  --scrollbar-thumb: #475569;
+  --scrollbar-thumb-hover: #64748b;
+}
+
+.light {
+  --notification-background: #ffffff;
+  --notification-foreground: #020617;
+
+  --bg-default: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --text-default: #0f172a;
+  --text-muted: #64748b;
+  --border-default: #e2e8f0;
+
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
+@theme inline {
+  --color-background: var(--bg-default);
+  --color-foreground: var(--text-default);
+  --color-card: var(--bg-card);
+  --color-input: var(--bg-input);
+  --color-border: var(--border-default);
+  --color-muted: var(--text-muted);
+  --color-primary: var(--primary);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+html {
+  scrollbar-gutter: stable;
+  overflow-y: scroll;
+}
+
+body {
+  background: var(--bg-default);
+  color: var(--text-default);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Link & Button Cursor Fix */
+a,
+button,
+[role="button"],
+input[type="submit"],
+input[type="button"] {
+  cursor: pointer;
+}
+
+a:hover,
+button:hover {
+  cursor: pointer;
+}
+
+/* Disabled state */
+button:disabled,
+a:disabled {
+  cursor: not-allowed;
+}
+
+/* Input focus styles */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Date input styling - only invert in dark mode */
+:root input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+
+.light input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+  cursor: pointer;
+}
+
+/* Selection color */
+::selection {
+  background: #9333ea;
+  color: white;
+}
+
+/* Select option styling for light mode */
+.light select option {
+  background: #ffffff;
+  color: #0f172a;
+}
