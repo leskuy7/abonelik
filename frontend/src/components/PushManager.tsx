@@ -29,13 +29,18 @@ export default function PushManager() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && 'serviceWorker' in navigator && (window as any).workbox !== undefined) {
-            navigator.serviceWorker.ready.then(reg => {
-                setRegistration(reg);
-                reg.pushManager.getSubscription().then(sub => {
+        if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+            // Register service worker explicitly
+            navigator.serviceWorker.register('/sw.js')
+                .then(reg => {
+                    console.log('Service Worker registered:', reg);
+                    setRegistration(reg);
+                    return reg.pushManager.getSubscription();
+                })
+                .then(sub => {
                     if (sub) setIsSubscribed(true);
-                });
-            });
+                })
+                .catch(err => console.error('Service Worker registration failed:', err));
         }
     }, []);
 
