@@ -14,11 +14,25 @@ router.get('/', auth, async (req, res) => {
         let totalMonthlyCost = 0;
 
         subscriptions.forEach(sub => {
-            if (sub.billingCycle === 'MONTHLY') {
-                totalMonthlyCost += sub.price;
-            } else if (sub.billingCycle === 'YEARLY') {
-                totalMonthlyCost += sub.price / 12;
+            let monthlyPrice = sub.price;
+
+            // Convert to monthly if yearly
+            if (sub.billingCycle === 'YEARLY') {
+                monthlyPrice = sub.price / 12;
+            } else if (sub.billingCycle === 'WEEKLY') {
+                monthlyPrice = sub.price * 4; // Approx
             }
+
+            // Convert to base currency (TRY)
+            // Mock rates for now - ideally fetch from API
+            const rates = {
+                TRY: 1,
+                USD: 36.0,
+                EUR: 39.0
+            };
+
+            const rate = rates[sub.currency] || 1;
+            totalMonthlyCost += monthlyPrice * rate;
         });
 
         // Basic stats

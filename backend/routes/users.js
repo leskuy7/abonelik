@@ -19,7 +19,9 @@ router.get('/profile', auth, async (req, res) => {
                 currency: true,
                 monthlyBudget: true,
                 onboardingComplete: true,
-                isAdmin: true
+                isAdmin: true,
+                language: true,
+                theme: true
             }
         });
         res.json(user);
@@ -53,14 +55,18 @@ router.put(
                 data: {
                     name,
                     currency,
-                    monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : null
+                    monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : null,
+                    language: req.body.language,
+                    theme: req.body.theme
                 },
                 select: {
                     id: true,
                     name: true,
                     email: true,
                     currency: true,
-                    monthlyBudget: true
+                    monthlyBudget: true,
+                    language: true,
+                    theme: true
                 }
             });
 

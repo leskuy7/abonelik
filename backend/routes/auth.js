@@ -223,7 +223,13 @@ router.post('/login', [
             user: {
                 id: user.id,
                 email: user.email,
-                name: user.name
+                name: user.name,
+                currency: user.currency,
+                monthlyBudget: user.monthlyBudget,
+                language: user.language,
+                theme: user.theme,
+                onboardingComplete: user.onboardingComplete,
+                isAdmin: user.isAdmin
             }
         });
     } catch (error) {

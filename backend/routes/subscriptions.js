@@ -24,6 +24,11 @@ router.post('/', auth, async (req, res) => {
     try {
         const { name, price, currency, billingCycle, startDate } = req.body;
 
+        const parsedPrice = parseFloat(price);
+        if (!name || isNaN(parsedPrice) || parsedPrice <= 0) {
+            return res.status(400).json({ message: 'Geçerli bir isim ve fiyat girin' });
+        }
+
         const start = new Date(startDate);
         let nextPayment = new Date(start);
 
@@ -37,7 +42,7 @@ router.post('/', auth, async (req, res) => {
             data: {
                 userId: req.user.userId,
                 name,
-                price: parseFloat(price),
+                price: parsedPrice,
                 currency,
                 billingCycle,
                 startDate: start,
@@ -90,6 +95,11 @@ router.put('/:id', auth, async (req, res) => {
             return res.status(404).json({ message: 'Subscription not found' });
         }
 
+        const parsedPrice = parseFloat(price);
+        if (!name || isNaN(parsedPrice) || parsedPrice <= 0) {
+            return res.status(400).json({ message: 'Geçerli bir isim ve fiyat girin' });
+        }
+
         const start = new Date(startDate);
         let nextPayment = new Date(start);
 
@@ -108,7 +118,7 @@ router.put('/:id', auth, async (req, res) => {
             where: { id: subscriptionId },
             data: {
                 name,
-                price: parseFloat(price),
+                price: parsedPrice,
                 currency,
                 billingCycle,
                 startDate: start,

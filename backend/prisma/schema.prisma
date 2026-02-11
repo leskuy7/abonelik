@@ -17,6 +17,8 @@ model User {
   onboardingComplete Boolean @default(false)
   currency          String   @default("TRY") // TRY, USD, EUR
   monthlyBudget     Float?
+  language          String   @default("tr") // tr, en
+  theme             String   @default("dark") // dark, light
   verificationToken String?  @unique
   googleId          String?  @unique
   createdAt         DateTime @default(now())

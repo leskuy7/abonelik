@@ -36,7 +36,8 @@ router.post(
                     name: true,
                     email: true,
                     onboardingComplete: true,
-                    currency: true
+                    currency: true,
+                    monthlyBudget: true
                 }
             });
 
