@@ -19,17 +19,6 @@ export const metadata: Metadata = {
   title: "SubTrack - Abonelik Takip Sistemi",
   description: "Aboneliklerinizi ve ödemelerinizi kolayca takip edin",
   manifest: "/manifest.json",
-  themeColor: "#020617",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "SubTrack",
-  },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
 };
 
 export default function RootLayout({
