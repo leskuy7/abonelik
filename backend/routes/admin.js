@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
-
-const prisma = new PrismaClient();
 
 // Admin middleware - only admins can access
 const adminOnly = async (req, res, next) => {
@@ -87,6 +85,14 @@ router.patch('/users/:id/admin', auth, adminOnly, async (req, res) => {
 
         if (!user) {
             return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+        }
+
+        // Prevent removing admin if this is the last admin
+        if (user.isAdmin) {
+            const adminCount = await prisma.user.count({ where: { isAdmin: true } });
+            if (adminCount <= 1) {
+                return res.status(400).json({ message: 'Sistemde en az bir admin bulunmalıdır' });
+            }
         }
 
         const updatedUser = await prisma.user.update({

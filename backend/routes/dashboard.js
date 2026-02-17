@@ -1,17 +1,31 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
-
-const prisma = new PrismaClient();
 
 router.get('/', auth, async (req, res) => {
     try {
+        // Fetch user to get their preferred currency
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.userId },
+            select: { currency: true }
+        });
+
+        const baseCurrency = user?.currency || 'TRY';
+
         const subscriptions = await prisma.subscription.findMany({
             where: { userId: req.user.userId, status: 'ACTIVE' }
         });
 
         let totalMonthlyCost = 0;
+
+        // Mock exchange rates — ideally these should come from a DB cache or API
+        // Rates are relative to TRY
+        const ratesToTRY = {
+            TRY: 1,
+            USD: 36.0,
+            EUR: 39.0
+        };
 
         subscriptions.forEach(sub => {
             let monthlyPrice = sub.price;
@@ -23,28 +37,21 @@ router.get('/', auth, async (req, res) => {
                 monthlyPrice = sub.price * 4; // Approx
             }
 
-            // Convert to base currency (TRY)
-            // Mock rates for now - ideally fetch from API
-            const rates = {
-                TRY: 1,
-                USD: 36.0,
-                EUR: 39.0
-            };
-
-            const rate = rates[sub.currency] || 1;
-            totalMonthlyCost += monthlyPrice * rate;
+            // Convert subscription currency to TRY first, then to user's base currency
+            const subToTRY = ratesToTRY[sub.currency] || 1;
+            const baseFromTRY = ratesToTRY[baseCurrency] || 1;
+            totalMonthlyCost += (monthlyPrice * subToTRY) / baseFromTRY;
         });
 
-        // Basic stats
         res.json({
             activeSubscriptions: subscriptions.length,
             totalMonthlyCost: totalMonthlyCost.toFixed(2),
-            currency: 'TRY' // Assuming mostly TRY for now, handling multi-currency is complex
+            currency: baseCurrency
         });
 
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 

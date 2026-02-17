@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const webpush = require('web-push');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
-
-const prisma = new PrismaClient();
 
 // Configure web-push
 // Keys are loaded from environment variables

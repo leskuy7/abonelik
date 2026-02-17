@@ -1,8 +1,6 @@
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
-const { PrismaClient } = require('@prisma/client');
-
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 
 // Email transporter
 const transporter = nodemailer.createTransport({
@@ -71,12 +69,12 @@ const checkUpcomingPayments = async () => {
 };
 
 // Schedule tasks to be run on the server.
-// Runs every day at 09:00 AM
+// Runs every day at 09:00 AM (Europe/Istanbul)
 const initCron = () => {
     cron.schedule('0 9 * * *', () => {
         checkUpcomingPayments();
-    });
-    console.log('Cron job initialized: Payment reminders check daily at 09:00 AM');
+    }, { timezone: 'Europe/Istanbul' });
+    console.log('Cron job initialized: Payment reminders check daily at 09:00 AM (Europe/Istanbul)');
 
     // Run once on startup for debugging/demo purposes (optional)
     // checkUpcomingPayments();

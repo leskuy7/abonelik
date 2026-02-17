@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 
@@ -44,7 +43,7 @@ router.post(
             res.json(user);
         } catch (err) {
             console.error(err.message);
-            res.status(500).send('Server Error');
+            res.status(500).json({ message: 'Sunucu hatası' });
         }
     }
 );

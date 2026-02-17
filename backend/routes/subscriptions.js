@@ -1,9 +1,48 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
 
-const prisma = new PrismaClient();
+const VALID_BILLING_CYCLES = ['MONTHLY', 'YEARLY'];
+const VALID_CURRENCIES = ['TRY', 'USD', 'EUR'];
+
+// Normalize price: handle Turkish comma format (e.g., "10,50" → 10.50)
+const normalizePrice = (price) => {
+    if (typeof price === 'string') {
+        price = price.replace(',', '.');
+    }
+    return parseFloat(price);
+};
+
+// Validate subscription input (shared between create and update)
+const validateSubscriptionInput = (body) => {
+    const errors = [];
+    const { name, price, currency, billingCycle, startDate } = body;
+
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
+        errors.push('Geçerli bir isim girin');
+    }
+
+    const parsedPrice = normalizePrice(price);
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+        errors.push('Geçerli bir fiyat girin (0\'dan büyük olmalı)');
+    }
+
+    if (!VALID_BILLING_CYCLES.includes(billingCycle)) {
+        errors.push(`Geçerli bir ödeme sıklığı girin: ${VALID_BILLING_CYCLES.join(', ')}`);
+    }
+
+    if (currency && !VALID_CURRENCIES.includes(currency)) {
+        errors.push(`Geçerli bir para birimi girin: ${VALID_CURRENCIES.join(', ')}`);
+    }
+
+    const parsedDate = new Date(startDate);
+    if (!startDate || isNaN(parsedDate.getTime())) {
+        errors.push('Geçerli bir başlangıç tarihi girin');
+    }
+
+    return { errors, parsedPrice, parsedDate };
+};
 
 // Get all subscriptions for logged in user
 router.get('/', auth, async (req, res) => {
@@ -15,23 +54,21 @@ router.get('/', auth, async (req, res) => {
         res.json(subscriptions);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
 // Add new subscription
 router.post('/', auth, async (req, res) => {
     try {
-        const { name, price, currency, billingCycle, startDate } = req.body;
-
-        const parsedPrice = parseFloat(price);
-        if (!name || isNaN(parsedPrice) || parsedPrice <= 0) {
-            return res.status(400).json({ message: 'Geçerli bir isim ve fiyat girin' });
+        const { errors, parsedPrice, parsedDate } = validateSubscriptionInput(req.body);
+        if (errors.length > 0) {
+            return res.status(400).json({ message: errors[0], errors });
         }
 
-        const start = new Date(startDate);
-        let nextPayment = new Date(start);
+        const { name, currency, billingCycle } = req.body;
 
+        let nextPayment = new Date(parsedDate);
         if (billingCycle === 'MONTHLY') {
             nextPayment.setMonth(nextPayment.getMonth() + 1);
         } else if (billingCycle === 'YEARLY') {
@@ -41,11 +78,11 @@ router.post('/', auth, async (req, res) => {
         const subscription = await prisma.subscription.create({
             data: {
                 userId: req.user.userId,
-                name,
+                name: name.trim(),
                 price: parsedPrice,
-                currency,
+                currency: currency || 'TRY',
                 billingCycle,
-                startDate: start,
+                startDate: parsedDate,
                 nextPaymentDate: nextPayment,
                 status: 'ACTIVE'
             }
@@ -54,7 +91,7 @@ router.post('/', auth, async (req, res) => {
         res.json(subscription);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
@@ -66,25 +103,24 @@ router.delete('/:id', auth, async (req, res) => {
         });
 
         if (!subscription) {
-            return res.status(404).json({ message: 'Subscription not found' });
+            return res.status(404).json({ message: 'Abonelik bulunamadı' });
         }
 
         await prisma.subscription.delete({
             where: { id: parseInt(req.params.id) }
         });
 
-        res.json({ message: 'Subscription removed' });
+        res.json({ message: 'Abonelik silindi' });
 
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
 // Update subscription
 router.put('/:id', auth, async (req, res) => {
     try {
-        const { name, price, currency, billingCycle, startDate } = req.body;
         const subscriptionId = parseInt(req.params.id);
 
         const subscription = await prisma.subscription.findFirst({
@@ -92,22 +128,17 @@ router.put('/:id', auth, async (req, res) => {
         });
 
         if (!subscription) {
-            return res.status(404).json({ message: 'Subscription not found' });
+            return res.status(404).json({ message: 'Abonelik bulunamadı' });
         }
 
-        const parsedPrice = parseFloat(price);
-        if (!name || isNaN(parsedPrice) || parsedPrice <= 0) {
-            return res.status(400).json({ message: 'Geçerli bir isim ve fiyat girin' });
+        const { errors, parsedPrice, parsedDate } = validateSubscriptionInput(req.body);
+        if (errors.length > 0) {
+            return res.status(400).json({ message: errors[0], errors });
         }
 
-        const start = new Date(startDate);
-        let nextPayment = new Date(start);
+        const { name, currency, billingCycle } = req.body;
 
-        // Calculate next payment date based on billing cycle if start date changed or just recalculate
-        // Logic: specific logic could be complex depending on if user wants to keep original cycle or reset.
-        // Simple approach: Recalculate next payment from new start date. 
-        // Better approach for edit: changing start date usually means resetting the cycle.
-
+        let nextPayment = new Date(parsedDate);
         if (billingCycle === 'MONTHLY') {
             nextPayment.setMonth(nextPayment.getMonth() + 1);
         } else if (billingCycle === 'YEARLY') {
@@ -117,11 +148,11 @@ router.put('/:id', auth, async (req, res) => {
         const updatedSubscription = await prisma.subscription.update({
             where: { id: subscriptionId },
             data: {
-                name,
+                name: name.trim(),
                 price: parsedPrice,
-                currency,
+                currency: currency || 'TRY',
                 billingCycle,
-                startDate: start,
+                startDate: parsedDate,
                 nextPaymentDate: nextPayment
             }
         });
@@ -129,7 +160,7 @@ router.put('/:id', auth, async (req, res) => {
         res.json(updatedSubscription);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: 'Server Error' });
+        res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 

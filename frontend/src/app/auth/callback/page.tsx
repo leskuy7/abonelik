@@ -3,6 +3,7 @@
 import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import api from '@/lib/api';
 
 function AuthCallbackContent() {
     const router = useRouter();
@@ -10,20 +11,31 @@ function AuthCallbackContent() {
     const { login } = useAuth();
 
     useEffect(() => {
-        const token = searchParams.get('token');
-        const userStr = searchParams.get('user');
+        const handleCallback = async () => {
+            const token = searchParams.get('token');
 
-        if (token && userStr) {
+            if (!token) {
+                router.push('/login?error=missing_params');
+                return;
+            }
+
             try {
-                const user = JSON.parse(decodeURIComponent(userStr));
+                // Store token first so api interceptor can use it
+                localStorage.setItem('token', token);
+
+                // Fetch full user profile from backend (instead of parsing from URL)
+                const response = await api.get('/users/profile');
+                const user = response.data;
+
                 login(token, user);
             } catch (error) {
                 console.error('Auth callback error:', error);
+                localStorage.removeItem('token');
                 router.push('/login?error=auth_callback_failed');
             }
-        } else {
-            router.push('/login?error=missing_params');
-        }
+        };
+
+        handleCallback();
     }, [searchParams, login, router]);
 
     return (

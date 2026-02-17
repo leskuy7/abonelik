@@ -36,5 +36,5 @@ Geliştirme aşamasında hızlı test için aşağıdaki kullanıcı tanımlanm�
 - **CORS:** Geliştirme ortamında `localhost:3000` ve `localhost:3001` portlarına izin verilmiştir.
 
 ## Teknoloji Yığını
-- **Frontend:** Next.js 15, Tailwind CSS, Lucide Icons
-- **Backend:** Node.js, Express, Prisma (MySQL)
+- **Frontend:** Next.js 16, React 19, Tailwind CSS v4, Lucide Icons
+- **Backend:** Node.js, Express 5, Prisma (PostgreSQL), web-push, node-cron
