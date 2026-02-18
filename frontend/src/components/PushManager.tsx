@@ -45,8 +45,14 @@ export default function PushManager() {
     }, []);
 
     const subscribe = async () => {
-        if (!registration || !VAPID_PUBLIC_KEY) {
-            alert(t.notificationNotSupported || 'Push bildirimleri bu tarayıcıda desteklenmiyor veya yapılandırma eksik.');
+        if (!registration) {
+            alert(t.serviceWorkerError || 'Servis çalışanı hazır değil. Lütfen sayfayı yenileyin.');
+            return;
+        }
+
+        if (!VAPID_PUBLIC_KEY) {
+            alert(t.vapidMissing || 'Bildirim anahtarı (VAPID Key) eksik. Lütfen site yöneticisine bildirin.');
+            console.error('VAPID_PUBLIC_KEY is missing in environment variables');
             return;
         }
 
@@ -61,9 +67,14 @@ export default function PushManager() {
             await api.post('/notifications/subscribe', sub);
             setIsSubscribed(true);
             alert(t.notificationsEnabled || 'Bildirimler başarıyla açıldı!');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Subscription error:', error);
-            alert(t.notificationPermissionDenied || 'Bildirim izni alınamadı.');
+
+            if (error.name === 'NotAllowedError') {
+                alert(t.notificationPermissionDenied || 'Bildirim izni reddedildi. Tarayıcı ayarlarından izin verin.');
+            } else {
+                alert((t.notificationError || 'Bildirim hatası: ') + (error.message || 'Bilinmeyen hata'));
+            }
         } finally {
             setLoading(false);
         }

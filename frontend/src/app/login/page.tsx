@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { Mail, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useSettings } from '@/context/SettingsContext';
 
-export default function LoginPage() {
+function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const { login } = useAuth();
@@ -21,6 +22,17 @@ export default function LoginPage() {
     const [resendLoading, setResendLoading] = useState(false);
     const [resendSuccess, setResendSuccess] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
+
+    // Show error from URL (e.g., Google OAuth redirect errors)
+    const urlError = searchParams.get('error');
+    const errorMessages: Record<string, string> = {
+        google_failed: 'Google ile giriş başarısız oldu. Lütfen tekrar deneyin.',
+        invalid_state: 'Güvenlik doğrulaması başarısız. Lütfen tekrar deneyin.',
+        state_expired: 'Oturum süresi doldu. Lütfen tekrar deneyin.',
+        missing_params: 'Eksik parametreler. Lütfen tekrar deneyin.',
+        auth_callback_failed: 'Giriş işlemi başarısız oldu. Lütfen tekrar deneyin.',
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -114,10 +126,10 @@ export default function LoginPage() {
                     <h2 className="text-2xl font-bold text-default mb-2">{t.loginWelcome}</h2>
                     <p className="text-muted mb-8">{t.loginDesc}</p>
 
-                    {error && (
+                    {(error || urlError) && (
                         <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg text-sm mb-6 flex items-center gap-2">
                             <AlertCircle size={16} />
-                            {error}
+                            {error || (urlError && errorMessages[urlError]) || 'Bir hata oluştu'}
                         </div>
                     )}
 
@@ -218,5 +230,13 @@ export default function LoginPage() {
                 </div>
             </div>
         </div>
+    );
+}
+
+export default function LoginPageWrapper() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-default text-foreground">Loading...</div>}>
+            <LoginPage />
+        </Suspense>
     );
 }

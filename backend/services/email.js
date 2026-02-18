@@ -11,6 +11,10 @@ const createTransporter = () => {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS,
             },
+            // Add connection timeout to prevent hanging
+            connectionTimeout: 10000, // 10 seconds
+            greetingTimeout: 5000,    // 5 seconds
+            socketTimeout: 10000,     // 10 seconds
         });
     }
     return null;
@@ -122,4 +126,50 @@ const sendWelcomeEmail = async (email, name) => {
     return true;
 };
 
-module.exports = { sendVerificationEmail, sendWelcomeEmail };
+const sendPasswordResetEmail = async (email, token) => {
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+
+    const mailOptions = {
+        from: process.env.EMAIL_USER || 'noreply@subtrack.com',
+        to: email,
+        subject: 'SubTrack - Şifre Sıfırlama Talebi',
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0f172a; color: #fff; padding: 40px; border-radius: 12px;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="display: inline-block; background: #9333ea; padding: 12px 16px; border-radius: 12px; font-size: 24px;">💳</div>
+                    <h1 style="margin: 16px 0 0; font-size: 24px; color: #fff;">SubTrack</h1>
+                </div>
+                
+                <p style="color: #94a3b8; font-size: 16px;">Şifrenizi sıfırlamak için bir talep aldık.</p>
+                <p style="color: #94a3b8; font-size: 16px;">Aşağıdaki butona tıklayarak yeni şifrenizi belirleyebilirsiniz:</p>
+                
+                <div style="text-align: center; margin: 32px 0;">
+                    <a href="${resetUrl}" 
+                       style="display: inline-block; background: #9333ea; color: #fff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
+                        Şifremi Sıfırla
+                    </a>
+                </div>
+                
+                <p style="color: #64748b; font-size: 14px;">Veya bu linki tarayıcınıza kopyalayın:</p>
+                <p style="color: #9333ea; font-size: 14px; word-break: break-all;">${resetUrl}</p>
+                
+                <p style="color: #64748b; font-size: 12px; text-align: center; margin-top: 30px;">
+                    Bu talebi siz yapmadıysanız, bu e-postayı görmezden gelebilirsiniz.
+                </p>
+            </div>
+        `
+    };
+
+    if (transporter) {
+        try {
+            await transporter.sendMail(mailOptions);
+            return true;
+        } catch (error) {
+            console.error('Error sending reset email:', error);
+            return false;
+        }
+    }
+    return true;
+};
+
+module.exports = { sendVerificationEmail, sendWelcomeEmail, sendPasswordResetEmail };

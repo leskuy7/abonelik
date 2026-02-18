@@ -67,6 +67,18 @@ const emailLimiter = rateLimit({
 app.use(generalLimiter);
 app.use(express.json({ limit: '10kb' })); // JSON payload sınırı
 
+// Request Logger Middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  const originalEnd = res.end;
+  res.end = function (...args) {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`);
+    originalEnd.apply(res, args);
+  };
+  next();
+});
+
 // Routes with rate limiting
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', authLimiter);
@@ -82,6 +94,29 @@ app.use('/api/notifications', require('./routes/notifications'));
 
 app.get('/', (req, res) => {
   res.send('Subscription Tracker API is running');
+});
+
+// Health Check & Debug Endpoint
+app.get('/api/health', (req, res) => {
+  const envStatus = {
+    NODE_ENV: !!process.env.NODE_ENV,
+    DATABASE_URL: !!process.env.DATABASE_URL,
+    JWT_SECRET: !!process.env.JWT_SECRET,
+    FRONTEND_URL: process.env.FRONTEND_URL || 'NOT SET',
+    BACKEND_URL: process.env.BACKEND_URL || 'NOT SET',
+    GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
+    EMAIL_USER: !!process.env.EMAIL_USER,
+    EMAIL_PASS: !!process.env.EMAIL_PASS,
+    VAPID_PUBLIC_KEY: !!process.env.VAPID_PUBLIC_KEY,
+    VAPID_PRIVATE_KEY: !!process.env.VAPID_PRIVATE_KEY,
+  };
+  const allSet = Object.values(envStatus).every(v => v && v !== 'NOT SET');
+  res.json({
+    status: allSet ? 'healthy' : 'degraded',
+    timestamp: new Date().toISOString(),
+    env: envStatus
+  });
 });
 
 // Global error handler

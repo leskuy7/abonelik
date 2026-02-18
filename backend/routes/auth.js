@@ -338,7 +338,10 @@ router.get('/google', (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;
 
+    console.log('[Google OAuth] GET /google - clientId set:', !!clientId, '- redirectUri:', redirectUri);
+
     if (!clientId) {
+        console.error('[Google OAuth] GOOGLE_CLIENT_ID is not set!');
         return res.status(500).json({ message: 'Google OAuth yapılandırılmamış' });
     }
 
@@ -438,7 +441,7 @@ router.get('/google/callback', async (req, res) => {
         // Redirect to frontend with token only (frontend fetches user via /users/profile)
         res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
     } catch (error) {
-        console.error('Google OAuth error:', error);
+        console.error('[Google OAuth] Callback error:', error.message || error);
         res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=google_failed`);
     }
 });
