@@ -8,16 +8,28 @@ import Navbar from '@/components/Navbar';
 const SELDA_EMAIL = 'karaaslanselda84@gmail.com';
 
 const loveReasons = [
-    "Gülüşün güneş gibi ☀️",
-    "Yanındayken her şey güzel 🌸",
-    "Seninle her an bir macera 🌍",
-    "Kalbim seninle atıyor 💚",
-    "Sen benim en güzel şansımsın 🍀",
-    "Gözlerindeki ışık yolumu aydınlatıyor ✨",
-    "Seninle saatler dakikalar gibi geçiyor ⏳",
-    "Her gün seni daha çok seviyorum 💫",
-    "Sen benim hayatımın anlamısın 🌹",
-    "Dünyanın en tatlı insanısın 🧁",
+    "Çok tatlı ve tatlımsınn",
+    "Hayatımda olman en güzel hissim",
+    "Gülüşün dünyanın en iyi olayı",
+    "Sensiz hiçbir güzel şey güzel değil",
+    "Senin yanın dünyanın en huzurlu yeri",
+    "Bu güzelliğinin sırrı nedirr",
+    "Seni ve seni sevmeyi seviyorum 💚",
+    "Her anımda yanımda ol istiyorum",
+    "Saçların kalbime dokunan en ipeksi masal gibi",
+    "Seninle olduğum her anımda yaşadığımı biliyorum",
+    "İyi ki varsın 💚",
+    "İnsana insan olduğunu hatırlatıyorsun",
+    "Her gecem her günüm sensin",
+    "Senin hayalini kurabilmek en güzel duygu",
+    "Yemyeşil gözlerinde kaybolmak istiyorum",
+    "Seni çokk seviyorum ❤️",
+    "Şimdi sen varsın yaşamak güzel",
+    "Her güzelliğin altında sanki imzan var",
+    "Yeşilinde kaybolmak, bulabileceğim en güzel yol.",
+    "Seninle susmak bile, başkasıyla konuşmaktan daha güzel",
+    "Ellerin, avucumda sakladığım en kıymetli hazinem.",
+    "En güzel duamsın"
 ];
 
 export default function SecretLovePage() {
@@ -124,8 +136,8 @@ export default function SecretLovePage() {
                             key={i}
                             onClick={() => revealCard(i)}
                             className={`relative aspect-square rounded-2xl transition-all duration-700 transform ${revealedCards.has(i)
-                                    ? 'rotate-0 scale-100'
-                                    : 'hover:scale-105 hover:-rotate-2 cursor-pointer'
+                                ? 'rotate-0 scale-100'
+                                : 'hover:scale-105 hover:-rotate-2 cursor-pointer'
                                 }`}
                             style={{
                                 perspective: '1000px',
