@@ -358,24 +358,32 @@ router.get('/google', (req, res) => {
 
 // Google OAuth - Callback
 router.get('/google/callback', async (req, res) => {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     try {
         const { code, error, state } = req.query;
+        console.log('[Google OAuth] Callback received - code:', !!code, '- error:', error || 'none', '- state:', !!state);
 
         if (error || !code) {
-            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=google_failed`);
+            console.error('[Google OAuth] No code or error from Google:', error);
+            return res.redirect(`${frontendUrl}/login?error=google_failed`);
         }
 
         // Validate OAuth state (CSRF protection)
         if (!state || !oauthStateStore.has(state)) {
-            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=invalid_state`);
+            console.error('[Google OAuth] Invalid state - state:', state, '- store has:', oauthStateStore.size, 'entries');
+            return res.redirect(`${frontendUrl}/login?error=invalid_state`);
         }
         const stateTimestamp = oauthStateStore.get(state);
         oauthStateStore.delete(state); // One-time use
         if (Date.now() - stateTimestamp > OAUTH_STATE_TTL) {
-            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=state_expired`);
+            console.error('[Google OAuth] State expired');
+            return res.redirect(`${frontendUrl}/login?error=state_expired`);
         }
 
         // Exchange code for tokens
+        const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;
+        console.log('[Google OAuth] Exchanging code for token - redirectUri:', redirectUri);
+
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -383,15 +391,17 @@ router.get('/google/callback', async (req, res) => {
                 code,
                 client_id: process.env.GOOGLE_CLIENT_ID,
                 client_secret: process.env.GOOGLE_CLIENT_SECRET,
-                redirect_uri: `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`,
+                redirect_uri: redirectUri,
                 grant_type: 'authorization_code',
             }),
         });
 
         const tokenData = await tokenResponse.json();
+        console.log('[Google OAuth] Token response status:', tokenResponse.status, '- has access_token:', !!tokenData.access_token);
 
         if (!tokenData.access_token) {
-            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=google_failed`);
+            console.error('[Google OAuth] Token exchange failed:', JSON.stringify(tokenData));
+            return res.redirect(`${frontendUrl}/login?error=google_failed`);
         }
 
         // Get user info
@@ -400,9 +410,11 @@ router.get('/google/callback', async (req, res) => {
         });
 
         const googleUser = await userResponse.json();
+        console.log('[Google OAuth] Google user:', googleUser.email, '- name:', googleUser.name);
 
         if (!googleUser.email) {
-            return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=google_failed`);
+            console.error('[Google OAuth] No email from Google user info');
+            return res.redirect(`${frontendUrl}/login?error=google_failed`);
         }
 
         // Find or create user
@@ -412,6 +424,7 @@ router.get('/google/callback', async (req, res) => {
 
         if (!user) {
             // Create new user
+            console.log('[Google OAuth] Creating new user for:', googleUser.email);
             user = await prisma.user.create({
                 data: {
                     email: googleUser.email,
@@ -422,6 +435,7 @@ router.get('/google/callback', async (req, res) => {
             });
         } else if (!user.googleId) {
             // Link Google account to existing user
+            console.log('[Google OAuth] Linking Google to existing user:', user.email);
             user = await prisma.user.update({
                 where: { id: user.id },
                 data: {
@@ -429,6 +443,8 @@ router.get('/google/callback', async (req, res) => {
                     isEmailVerified: true,
                 },
             });
+        } else {
+            console.log('[Google OAuth] Existing Google user login:', user.email);
         }
 
         // Generate JWT
@@ -438,11 +454,13 @@ router.get('/google/callback', async (req, res) => {
             { expiresIn: '7d', algorithm: 'HS256' }
         );
 
-        // Redirect to frontend with token only (frontend fetches user via /users/profile)
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/auth/callback?token=${token}`);
+        console.log('[Google OAuth] Success! Redirecting to frontend with token for user:', user.email);
+        // Redirect to frontend with token
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
     } catch (error) {
         console.error('[Google OAuth] Callback error:', error.message || error);
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=google_failed`);
+        console.error('[Google OAuth] Stack:', error.stack);
+        res.redirect(`${frontendUrl}/login?error=google_failed`);
     }
 });
 
