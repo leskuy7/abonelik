@@ -8,6 +8,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { CreditCard, TrendingUp, Calendar, Wallet, ArrowUpRight } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import { useIsSelda, GreenHeartsAnimation, SeldaDashboardOverlay, SeldaWelcomeBanner } from '@/components/SeldaSpecial';
 
 // Sadece ilk ismi al
 const getFirstName = (name: string | null | undefined): string => {
@@ -21,6 +22,16 @@ export default function Dashboard() {
     const router = useRouter();
     const [stats, setStats] = useState<any>(null);
     const [menuOpen, setMenuOpen] = useState(false);
+    const isSelda = useIsSelda();
+    const [showHeartsAnimation, setShowHeartsAnimation] = useState(false);
+
+    // Show hearts animation for Selda on first visit per session
+    useEffect(() => {
+        if (isSelda && !sessionStorage.getItem('selda_hearts_shown')) {
+            setShowHeartsAnimation(true);
+            sessionStorage.setItem('selda_hearts_shown', 'true');
+        }
+    }, [isSelda]);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -43,11 +54,17 @@ export default function Dashboard() {
     );
 
     return (
-        <div className="min-h-screen w-full">
+        <div className="min-h-screen w-full relative">
+            {/* Selda Special Effects */}
+            {showHeartsAnimation && <GreenHeartsAnimation />}
+            {isSelda && <SeldaDashboardOverlay />}
+
             <Navbar />
 
             {/* Content */}
-            <div className="max-w-6xl mx-auto px-4 py-6">
+            <div className="max-w-6xl mx-auto px-4 py-6 relative z-10">
+                {/* Selda Welcome Banner */}
+                {isSelda && <SeldaWelcomeBanner />}
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h1 className="text-xl font-bold text-default">{t.welcome} {getFirstName(user.name)} 👋</h1>
