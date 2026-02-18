@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { SettingsProvider } from "@/context/SettingsContext";
 import Navbar from "@/components/Navbar";
+import BackendWakeUp from "@/components/BackendWakeUp";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,7 @@ export default function RootLayout({
       >
         <AuthProvider>
           <SettingsProvider>
+            <BackendWakeUp />
             {children}
           </SettingsProvider>
         </AuthProvider>
