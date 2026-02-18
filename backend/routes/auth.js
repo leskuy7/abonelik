@@ -455,8 +455,20 @@ router.get('/google/callback', async (req, res) => {
         );
 
         console.log('[Google OAuth] Success! Redirecting to frontend with token for user:', user.email);
+        // Redirect to frontend with token AND user data
+        const userData = encodeURIComponent(JSON.stringify({
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            currency: user.currency || 'TRY',
+            monthlyBudget: user.monthlyBudget,
+            language: user.language || 'tr',
+            theme: user.theme || 'dark',
+            onboardingComplete: user.onboardingComplete || false,
+            isAdmin: user.isAdmin || false,
+        }));
         // Redirect to frontend with token
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}&user=${userData}`);
     } catch (error) {
         console.error('[Google OAuth] Callback error:', error.message || error);
         console.error('[Google OAuth] Stack:', error.stack);

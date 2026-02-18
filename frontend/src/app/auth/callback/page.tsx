@@ -14,6 +14,7 @@ function AuthCallbackContent() {
     useEffect(() => {
         const handleCallback = async () => {
             const token = searchParams.get('token');
+            const userParam = searchParams.get('user');
             const errorParam = searchParams.get('error');
 
             if (errorParam) {
@@ -29,18 +30,32 @@ function AuthCallbackContent() {
             }
 
             try {
-                console.log('[Auth Callback] Token received, fetching user profile...');
-                // Store token first so api interceptor can use it
+                // Store token first
                 localStorage.setItem('token', token);
 
-                // Fetch full user profile from backend
-                const response = await api.get('/users/profile');
-                const user = response.data;
-                console.log('[Auth Callback] User profile fetched:', user.email);
+                let userData;
 
-                login(token, user);
+                // Try to get user data from URL params first (faster, no extra API call)
+                if (userParam) {
+                    try {
+                        userData = JSON.parse(decodeURIComponent(userParam));
+                        console.log('[Auth Callback] User data from URL:', userData.email);
+                    } catch (e) {
+                        console.error('[Auth Callback] Failed to parse user from URL, fetching from API');
+                    }
+                }
+
+                // Fallback: fetch from API if user data not in URL
+                if (!userData) {
+                    console.log('[Auth Callback] Fetching user profile from API...');
+                    const response = await api.get('/users/profile');
+                    userData = response.data;
+                    console.log('[Auth Callback] User profile fetched:', userData.email);
+                }
+
+                login(token, userData);
             } catch (err: any) {
-                console.error('[Auth Callback] Error fetching profile:', err.response?.status, err.response?.data || err.message);
+                console.error('[Auth Callback] Error:', err.response?.status, err.response?.data || err.message);
                 localStorage.removeItem('token');
                 setError('Giriş işlemi başarısız oldu. Lütfen tekrar deneyin.');
                 setTimeout(() => {
