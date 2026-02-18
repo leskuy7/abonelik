@@ -1,7 +1,11 @@
 node_modules
+node_modules_old
 .env
+.env.local
 .next
 dist
 build
 .DS_Store
 coverage
+*.log
+tsconfig.tsbuildinfo

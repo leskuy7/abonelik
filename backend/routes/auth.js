@@ -338,7 +338,7 @@ router.get('/google', (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;
 
-    console.log('[Google OAuth] GET /google - clientId set:', !!clientId, '- redirectUri:', redirectUri);
+    console.log('[Google OAuth] GET /google - clientId set:', !!clientId);
 
     if (!clientId) {
         console.error('[Google OAuth] GOOGLE_CLIENT_ID is not set!');
@@ -361,7 +361,7 @@ router.get('/google/callback', async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     try {
         const { code, error, state } = req.query;
-        console.log('[Google OAuth] Callback received - code:', !!code, '- error:', error || 'none', '- state:', !!state);
+        console.log('[Google OAuth] Callback received - hasCode:', !!code, '- hasState:', !!state);
 
         if (error || !code) {
             console.error('[Google OAuth] No code or error from Google:', error);
@@ -382,7 +382,7 @@ router.get('/google/callback', async (req, res) => {
 
         // Exchange code for tokens
         const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;
-        console.log('[Google OAuth] Exchanging code for token - redirectUri:', redirectUri);
+        console.log('[Google OAuth] Exchanging code for token...');
 
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -397,10 +397,10 @@ router.get('/google/callback', async (req, res) => {
         });
 
         const tokenData = await tokenResponse.json();
-        console.log('[Google OAuth] Token response status:', tokenResponse.status, '- has access_token:', !!tokenData.access_token);
+        console.log('[Google OAuth] Token response status:', tokenResponse.status);
 
         if (!tokenData.access_token) {
-            console.error('[Google OAuth] Token exchange failed:', JSON.stringify(tokenData));
+            console.error('[Google OAuth] Token exchange failed');
             return res.redirect(`${frontendUrl}/login?error=google_failed`);
         }
 
@@ -410,7 +410,7 @@ router.get('/google/callback', async (req, res) => {
         });
 
         const googleUser = await userResponse.json();
-        console.log('[Google OAuth] Google user:', googleUser.email, '- name:', googleUser.name);
+        console.log('[Google OAuth] Google user info received');
 
         if (!googleUser.email) {
             console.error('[Google OAuth] No email from Google user info');
@@ -424,7 +424,7 @@ router.get('/google/callback', async (req, res) => {
 
         if (!user) {
             // Create new user
-            console.log('[Google OAuth] Creating new user for:', googleUser.email);
+            console.log('[Google OAuth] Creating new user');
             user = await prisma.user.create({
                 data: {
                     email: googleUser.email,
@@ -435,7 +435,7 @@ router.get('/google/callback', async (req, res) => {
             });
         } else if (!user.googleId) {
             // Link Google account to existing user
-            console.log('[Google OAuth] Linking Google to existing user:', user.email);
+            console.log('[Google OAuth] Linking Google to existing user');
             user = await prisma.user.update({
                 where: { id: user.id },
                 data: {
@@ -444,7 +444,7 @@ router.get('/google/callback', async (req, res) => {
                 },
             });
         } else {
-            console.log('[Google OAuth] Existing Google user login:', user.email);
+            console.log('[Google OAuth] Existing Google user login');
         }
 
         // Generate JWT
@@ -454,7 +454,7 @@ router.get('/google/callback', async (req, res) => {
             { expiresIn: '7d', algorithm: 'HS256' }
         );
 
-        console.log('[Google OAuth] Success! Redirecting to frontend with token for user:', user.email);
+        console.log('[Google OAuth] Success! Redirecting to frontend');
         // Redirect to frontend with token AND user data
         const userData = encodeURIComponent(JSON.stringify({
             id: user.id,
