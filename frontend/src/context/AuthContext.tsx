@@ -12,6 +12,8 @@ interface User {
     onboardingComplete?: boolean;
     currency?: string;
     monthlyBudget?: number;
+    language?: string;
+    theme?: string;
 }
 
 interface AuthContextType {
