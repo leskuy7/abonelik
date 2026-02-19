@@ -1,0 +1,2 @@
+-- Baseline migration for existing PostgreSQL schema.
+-- This migration is intentionally empty.
