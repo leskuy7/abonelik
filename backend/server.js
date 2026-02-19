@@ -23,16 +23,20 @@ app.use(cors({
 
     const allowedOrigins = [
       process.env.FRONTEND_URL,
+      'https://abonelik-kappa.vercel.app',
+      'https://frontend-ten-pink-85.vercel.app',
       'http://localhost:3000',
       'http://localhost:3001',
       'http://127.0.0.1:3001'
     ];
 
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
+    // Also allow any vercel.app preview deployments for this project
+    if (origin.endsWith('.vercel.app') || allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
     }
-    return callback(null, true);
+
+    const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    return callback(new Error(msg), false);
   },
   credentials: true
 }));
