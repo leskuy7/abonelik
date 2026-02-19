@@ -19,13 +19,21 @@ function AuthCallbackContent() {
         processedRef.current = true;
 
         const errorParam = searchParams.get('error');
+        const tokenParam = searchParams.get('token');
 
         if (errorParam) {
             router.replace(`/login?error=${errorParam}`);
             return;
         }
 
-        api.get('/users/profile')
+        if (!tokenParam) {
+            router.replace('/login?error=missing_params');
+            return;
+        }
+
+        // Set cookie via a backend endpoint, then fetch profile
+        api.post('/auth/set-token', { token: tokenParam })
+            .then(() => api.get('/users/profile'))
             .then((response) => {
                 login(response.data);
             })

@@ -311,6 +311,22 @@ router.post('/logout', (req, res) => {
     res.json({ message: 'Çıkış yapıldı' });
 });
 
+// Set token as cookie (for cross-domain OAuth flow)
+router.post('/set-token', (req, res) => {
+    const { token } = req.body;
+    if (!token) {
+        return res.status(400).json({ message: 'Token gerekli' });
+    }
+    try {
+        // Verify the token is valid before setting cookie
+        jwt.verify(token, process.env.JWT_SECRET);
+        res.cookie('auth_token', token, getAuthCookieOptions());
+        res.json({ message: 'Token set' });
+    } catch {
+        return res.status(401).json({ message: 'Geçersiz token' });
+    }
+});
+
 // Google OAuth - Get URL
 router.get('/google', (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -434,7 +450,7 @@ router.get('/google/callback', async (req, res) => {
 
         logger.info('[Google OAuth] Success! Redirecting to frontend');
         res.cookie('auth_token', token, getAuthCookieOptions());
-        res.redirect(`${frontendUrl}/auth/callback`);
+        res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
     } catch (error) {
         logger.error({ err: error }, '[Google OAuth] Callback error');
         res.redirect(`${frontendUrl}/login?error=google_failed`);
