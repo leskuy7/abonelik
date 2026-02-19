@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '@/lib/api';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -11,11 +11,28 @@ import { useAuth } from '@/context/AuthContext';
 export default function RegisterPage() {
     const [formData, setFormData] = useState({ name: '', email: '', password: '' });
     const { t } = useSettings();
+    const { user, loading: authLoading } = useAuth();
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
+
+    // 🔒 Auth Guard: Redirect to dashboard if already logged in
+    useEffect(() => {
+        if (!authLoading && user) {
+            router.replace('/dashboard');
+        }
+    }, [user, authLoading, router]);
+
+    // Show loading while checking auth state
+    if (authLoading || user) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-default">
+                <div className="w-10 h-10 border-2 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

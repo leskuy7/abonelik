@@ -41,8 +41,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const savedUser = localStorage.getItem('user');
 
             if (token && savedUser) {
-                // Optionally verify token with backend here
-                setUser(JSON.parse(savedUser));
+                try {
+                    // Validate token by fetching fresh user data from backend
+                    const response = await api.get('/users/profile');
+                    setUser(response.data);
+                    // Update stored user with fresh data
+                    localStorage.setItem('user', JSON.stringify(response.data));
+                } catch (err) {
+                    // Token is invalid/expired — clear everything
+                    console.warn('[Auth] Token validation failed, logging out');
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    setUser(null);
+                }
             }
             setLoading(false);
         };
@@ -70,6 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const logout = useCallback(() => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        sessionStorage.clear(); // Clear session-specific data
         setUser(null);
         router.push('/login');
     }, [router]);

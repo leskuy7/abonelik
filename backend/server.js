@@ -121,6 +121,6 @@ require('./services/cron')();
 
 app.listen(PORT, () => {
   console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log(`📡 API: http://localhost:${PORT}/api`);
+  console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔒 Security: Helmet, CORS, Rate Limiting enabled\n`);
 });
