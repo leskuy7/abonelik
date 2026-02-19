@@ -53,6 +53,8 @@ const processRenewals = async () => {
                     nextDate.setMonth(nextDate.getMonth() + 1);
                 } else if (sub.billingCycle === 'YEARLY') {
                     nextDate.setFullYear(nextDate.getFullYear() + 1);
+                } else if (sub.billingCycle === 'WEEKLY') {
+                    nextDate.setDate(nextDate.getDate() + 7);
                 }
 
                 // If the new date is still in the past, keep advancing
@@ -63,6 +65,8 @@ const processRenewals = async () => {
                         nextDate.setMonth(nextDate.getMonth() + 1);
                     } else if (sub.billingCycle === 'YEARLY') {
                         nextDate.setFullYear(nextDate.getFullYear() + 1);
+                    } else if (sub.billingCycle === 'WEEKLY') {
+                        nextDate.setDate(nextDate.getDate() + 7);
                     }
                 }
 

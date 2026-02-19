@@ -18,8 +18,8 @@ const subscriptionSchema = z.object({
     name: z.string().min(1, 'Geçerli bir isim girin').max(200, 'İsim çok uzun').trim(),
     price: normalizePrice,
     currency: z.enum(['TRY', 'USD', 'EUR']).optional().default('TRY'),
-    billingCycle: z.enum(['MONTHLY', 'YEARLY'], {
-        errorMap: () => ({ message: 'Geçerli bir ödeme sıklığı girin: MONTHLY, YEARLY' }),
+    billingCycle: z.enum(['MONTHLY', 'YEARLY', 'WEEKLY'], {
+        errorMap: () => ({ message: 'Geçerli bir ödeme sıklığı girin: MONTHLY, YEARLY, WEEKLY' }),
     }),
     startDate: z.string().or(z.date()).transform((val) => new Date(val))
         .refine((d) => !isNaN(d.getTime()), { message: 'Geçerli bir başlangıç tarihi girin' }),
