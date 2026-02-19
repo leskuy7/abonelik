@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const logger = require('../lib/logger');
 
 // Create transporter
 const createTransporter = () => {
@@ -61,21 +62,15 @@ const sendVerificationEmail = async (email, name, verificationToken) => {
     if (transporter) {
         try {
             await transporter.sendMail(mailOptions);
-            console.log('Verification email sent to:', email);
+            logger.info({ to: email }, 'Verification email sent');
             return true;
         } catch (error) {
-            console.error('Error sending email:', error);
+            logger.error({ err: error, to: email }, 'Error sending verification email');
             return false;
         }
     } else {
         // Development mode - log to console
-        console.log('\n═══════════════════════════════════════════════════════════════');
-        console.log('📧 DEVELOPMENT MODE - Email would be sent:');
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log('To:', email);
-        console.log('Subject:', mailOptions.subject);
-        console.log('Verification URL:', verificationUrl);
-        console.log('═══════════════════════════════════════════════════════════════\n');
+        logger.info({ to: email, verificationUrl }, 'DEV MODE: Verification email (not sent)');
         return true;
     }
 };
@@ -119,7 +114,7 @@ const sendWelcomeEmail = async (email, name) => {
             await transporter.sendMail(mailOptions);
             return true;
         } catch (error) {
-            console.error('Error sending welcome email:', error);
+            logger.error({ err: error, to: email }, 'Error sending welcome email');
             return false;
         }
     }
@@ -165,7 +160,7 @@ const sendPasswordResetEmail = async (email, token) => {
             await transporter.sendMail(mailOptions);
             return true;
         } catch (error) {
-            console.error('Error sending reset email:', error);
+            logger.error({ err: error, to: email }, 'Error sending reset email');
             return false;
         }
     }

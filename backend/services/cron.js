@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
 const prisma = require('../lib/prisma');
+const logger = require('../lib/logger');
 
 // Email transporter
 const transporter = nodemailer.createTransport({
@@ -11,15 +12,91 @@ const transporter = nodemailer.createTransport({
     },
 });
 
+// ─── Renewal Worker ────────────────────────────────────────
+// Processes overdue subscriptions: creates invoices and advances nextPaymentDate
+const processRenewals = async () => {
+    logger.info('Running renewal worker...');
+    try {
+        const today = new Date();
+        today.setHours(23, 59, 59, 999); // End of today
+
+        // Find all ACTIVE subscriptions where nextPaymentDate has passed
+        const overdueSubscriptions = await prisma.subscription.findMany({
+            where: {
+                nextPaymentDate: { lte: today },
+                status: 'ACTIVE',
+            },
+            include: { user: true },
+        });
+
+        logger.info({ count: overdueSubscriptions.length }, 'Found overdue subscriptions');
+
+        let invoicesCreated = 0;
+        let subscriptionsRenewed = 0;
+
+        for (const sub of overdueSubscriptions) {
+            try {
+                // Create invoice for the overdue period
+                await prisma.invoice.create({
+                    data: {
+                        subscriptionId: sub.id,
+                        amount: sub.price,
+                        dueDate: sub.nextPaymentDate,
+                        status: 'PENDING',
+                    },
+                });
+                invoicesCreated++;
+
+                // Advance nextPaymentDate to next billing cycle
+                const nextDate = new Date(sub.nextPaymentDate);
+                if (sub.billingCycle === 'MONTHLY') {
+                    nextDate.setMonth(nextDate.getMonth() + 1);
+                } else if (sub.billingCycle === 'YEARLY') {
+                    nextDate.setFullYear(nextDate.getFullYear() + 1);
+                }
+
+                // If the new date is still in the past, keep advancing
+                // (handles cases where cron was down for multiple cycles)
+                const now = new Date();
+                while (nextDate <= now) {
+                    if (sub.billingCycle === 'MONTHLY') {
+                        nextDate.setMonth(nextDate.getMonth() + 1);
+                    } else if (sub.billingCycle === 'YEARLY') {
+                        nextDate.setFullYear(nextDate.getFullYear() + 1);
+                    }
+                }
+
+                await prisma.subscription.update({
+                    where: { id: sub.id },
+                    data: { nextPaymentDate: nextDate },
+                });
+                subscriptionsRenewed++;
+
+                logger.info({
+                    subscriptionId: sub.id,
+                    name: sub.name,
+                    userId: sub.userId,
+                    nextPaymentDate: nextDate.toISOString(),
+                }, 'Subscription renewed');
+            } catch (subError) {
+                logger.error({ err: subError, subscriptionId: sub.id }, 'Failed to process subscription renewal');
+            }
+        }
+
+        logger.info({ invoicesCreated, subscriptionsRenewed }, 'Renewal worker completed');
+    } catch (error) {
+        logger.error({ err: error }, 'Renewal worker failed');
+    }
+};
+
+// ─── Payment Reminders ─────────────────────────────────────
 const checkUpcomingPayments = async () => {
-    console.log('Running payment reminder job...');
+    logger.info('Running payment reminder job...');
     try {
         const today = new Date();
         const threeDaysLater = new Date();
         threeDaysLater.setDate(today.getDate() + 3);
 
-        // Find subscriptions expiring in 3 days
-        // Note: This is a simplified check. Real world date comparison should be more robust (ignoring time).
         const startOfRange = new Date(threeDaysLater);
         startOfRange.setHours(0, 0, 0, 0);
 
@@ -34,50 +111,51 @@ const checkUpcomingPayments = async () => {
                 },
                 status: 'ACTIVE'
             },
-            include: {
-                user: true
-            }
+            include: { user: true }
         });
 
-        console.log(`Found ${subscriptions.length} subscriptions due in 3 days.`);
+        logger.info({ count: subscriptions.length }, 'Found subscriptions due in 3 days');
 
         for (const sub of subscriptions) {
             const mailOptions = {
                 from: process.env.EMAIL_USER,
                 to: sub.user.email,
-                subject: `Upcoming Payment Reminder: ${sub.name}`,
-                text: `Hello ${sub.user.name || 'User'},\n\nYour subscription for ${sub.name} is due on ${sub.nextPaymentDate.toDateString()}.\nAmount: ${sub.price} ${sub.currency}\n\nPlease ensure you have sufficient funds.\n\nBest,\nSubscription Tracker`
+                subject: `Yaklaşan Ödeme: ${sub.name}`,
+                text: `Merhaba ${sub.user.name || 'Kullanıcı'},\n\n${sub.name} aboneliğinizin ödeme tarihi ${sub.nextPaymentDate.toLocaleDateString('tr-TR')} tarihinde.\nTutar: ${Number(sub.price)} ${sub.currency}\n\nSubTrack`
             };
 
             if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-                transporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        console.log('Error sending email:', error);
-                    } else {
-                        console.log('Email sent: ' + info.response);
-                    }
-                });
+                try {
+                    await transporter.sendMail(mailOptions);
+                    logger.info({ to: sub.user.email, subscription: sub.name }, 'Reminder email sent');
+                } catch (emailErr) {
+                    logger.error({ err: emailErr, to: sub.user.email }, 'Failed to send reminder email');
+                }
             } else {
-                console.log('Mock Email sent to:', sub.user.email);
-                console.log(mailOptions.text);
+                logger.debug({ to: sub.user.email }, 'Mock reminder email (no email config)');
             }
         }
-
     } catch (error) {
-        console.error('Error in cron job:', error);
+        logger.error({ err: error }, 'Payment reminder job failed');
     }
 };
 
-// Schedule tasks to be run on the server.
-// Runs every day at 09:00 AM (Europe/Istanbul)
+// ─── Cron Schedule ──────────────────────────────────────────
 const initCron = () => {
+    // Renewal worker: runs every day at 00:05 (just after midnight)
+    cron.schedule('5 0 * * *', () => {
+        processRenewals();
+    }, { timezone: 'Europe/Istanbul' });
+
+    // Payment reminders: runs every day at 09:00
     cron.schedule('0 9 * * *', () => {
         checkUpcomingPayments();
     }, { timezone: 'Europe/Istanbul' });
-    console.log('Cron job initialized: Payment reminders check daily at 09:00 AM (Europe/Istanbul)');
 
-    // Run once on startup for debugging/demo purposes (optional)
-    // checkUpcomingPayments();
+    logger.info('Cron jobs initialized: Renewals at 00:05, Reminders at 09:00 (Europe/Istanbul)');
+
+    // Run renewal worker once on startup to catch up on missed renewals
+    processRenewals();
 };
 
 module.exports = initCron;

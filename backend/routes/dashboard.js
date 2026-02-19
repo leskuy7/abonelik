@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
+const logger = require('../lib/logger');
 
 router.get('/', auth, async (req, res) => {
     try {
@@ -28,13 +29,13 @@ router.get('/', auth, async (req, res) => {
         };
 
         subscriptions.forEach(sub => {
-            let monthlyPrice = sub.price;
+            let monthlyPrice = Number(sub.price); // Prisma Decimal → Number
 
             // Convert to monthly if yearly
             if (sub.billingCycle === 'YEARLY') {
-                monthlyPrice = sub.price / 12;
+                monthlyPrice = Number(sub.price) / 12;
             } else if (sub.billingCycle === 'WEEKLY') {
-                monthlyPrice = sub.price * 4; // Approx
+                monthlyPrice = Number(sub.price) * 4; // Approx
             }
 
             // Convert subscription currency to TRY first, then to user's base currency
@@ -50,7 +51,7 @@ router.get('/', auth, async (req, res) => {
         });
 
     } catch (err) {
-        console.error(err);
+        logger.error({ err, userId: req.user.userId }, 'Dashboard error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });

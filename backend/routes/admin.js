@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
+const logger = require('../lib/logger');
 
 // Admin middleware - only admins can access
 const adminOnly = async (req, res, next) => {
@@ -39,7 +40,7 @@ router.get('/users', auth, adminOnly, async (req, res) => {
         });
         res.json(users);
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Admin route error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
@@ -66,7 +67,7 @@ router.delete('/users/:id', auth, adminOnly, async (req, res) => {
 
         res.json({ message: 'Kullanıcı silindi' });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Admin route error');
         res.status(500).json({ message: 'Kullanıcı silinemedi' });
     }
 });
@@ -102,7 +103,7 @@ router.patch('/users/:id/admin', auth, adminOnly, async (req, res) => {
 
         res.json({ isAdmin: updatedUser.isAdmin });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Admin route error');
         res.status(500).json({ message: 'Güncelleme başarısız' });
     }
 });
@@ -122,7 +123,7 @@ router.patch('/users/:id/verify', auth, adminOnly, async (req, res) => {
 
         res.json({ message: 'E-posta doğrulandı' });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Admin route error');
         res.status(500).json({ message: 'Doğrulama başarısız' });
     }
 });
@@ -143,7 +144,7 @@ router.get('/stats', auth, adminOnly, async (req, res) => {
             totalSubscriptions
         });
     } catch (error) {
-        console.error(error);
+        logger.error({ err: error }, 'Admin route error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
@@ -158,7 +159,7 @@ router.post('/seed', async (req, res) => {
             return res.status(403).json({ message: 'Geçersiz anahtar' });
         }
 
-        console.log('[Admin Seed] Starting database reset...');
+        logger.info('[Admin Seed] Starting database reset...');
 
         // Delete all data in order (respect foreign keys)
         await prisma.invoice.deleteMany({});
@@ -166,7 +167,7 @@ router.post('/seed', async (req, res) => {
         await prisma.pushSubscription.deleteMany({});
         await prisma.user.deleteMany({});
 
-        console.log('[Admin Seed] All data deleted');
+        logger.info('[Admin Seed] All data deleted');
 
         // Create admin user
         const adminPassword = await bcrypt.hash('admin123', 12);
@@ -241,7 +242,7 @@ router.post('/seed', async (req, res) => {
             ],
         });
 
-        console.log('[Admin Seed] Seed completed successfully');
+        logger.info('[Admin Seed] Seed completed successfully');
 
         res.json({
             message: 'Veritabanı sıfırlandı ve hazır hesaplar oluşturuldu',
@@ -252,7 +253,7 @@ router.post('/seed', async (req, res) => {
             subscriptions: ['Netflix (₺149.99)', 'Spotify (₺59.99)', 'YouTube Premium (₺79.99)'],
         });
     } catch (error) {
-        console.error('[Admin Seed] Error:', error);
+        logger.error({ err: error }, '[Admin Seed] Error');
         res.status(500).json({ message: 'Seed başarısız: ' + error.message });
     }
 });

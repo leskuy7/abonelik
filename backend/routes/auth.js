@@ -3,9 +3,10 @@ const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
-const { body, validationResult } = require('express-validator');
 const prisma = require('../lib/prisma');
+const logger = require('../lib/logger');
 const { sendVerificationEmail, sendWelcomeEmail } = require('../services/email');
+const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, resendVerificationSchema, validate } = require('../lib/validation');
 
 // In-memory OAuth state store with TTL (10 minutes)
 const oauthStateStore = new Map();
@@ -26,42 +27,8 @@ const generateVerificationToken = () => {
     return crypto.randomBytes(32).toString('hex');
 };
 
-// Validation middleware
-const validateEmail = body('email')
-    .isEmail().withMessage('Geçerli bir e-posta adresi girin')
-    .normalizeEmail()
-    .isLength({ max: 255 }).withMessage('E-posta çok uzun');
-
-const validatePassword = body('password')
-    .isLength({ min: 6 }).withMessage('Şifre en az 6 karakter olmalı')
-    .isLength({ max: 100 }).withMessage('Şifre çok uzun')
-    .matches(/^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]*$/).withMessage('Şifre geçersiz karakterler içeriyor');
-
-const validateName = body('name')
-    .optional()
-    .trim()
-    .isLength({ max: 100 }).withMessage('İsim çok uzun')
-    .escape(); // XSS koruması
-
-// Handle validation errors
-const handleValidationErrors = (req, res, next) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        return res.status(400).json({
-            message: errors.array()[0].msg,
-            errors: errors.array()
-        });
-    }
-    next();
-};
-
 // Register
-router.post('/register', [
-    validateEmail,
-    validatePassword,
-    validateName,
-    handleValidationErrors
-], async (req, res) => {
+router.post('/register', validate(registerSchema), async (req, res) => {
     try {
         const { email, password, name } = req.body;
 
@@ -101,7 +68,7 @@ router.post('/register', [
             requiresVerification: true
         });
     } catch (error) {
-        console.error('Register error:', error);
+        logger.error({ err: error }, 'Register error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
@@ -147,16 +114,13 @@ router.get('/verify-email', async (req, res) => {
 
         res.json({ message: 'E-posta başarıyla doğrulandı! Şimdi giriş yapabilirsiniz.' });
     } catch (error) {
-        console.error('Verify email error:', error);
+        logger.error({ err: error }, 'Verify email error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
 // Resend verification email
-router.post('/resend-verification', [
-    validateEmail,
-    handleValidationErrors
-], async (req, res) => {
+router.post('/resend-verification', validate(resendVerificationSchema), async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -189,13 +153,13 @@ router.post('/resend-verification', [
 
         res.json({ message: 'Doğrulama e-postası tekrar gönderildi' });
     } catch (error) {
-        console.error('Resend verification error:', error);
+        logger.error({ err: error }, 'Resend verification error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
 // Forgot Password
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', validate(forgotPasswordSchema), async (req, res) => {
     try {
         const { email } = req.body;
         const user = await prisma.user.findUnique({ where: { email } });
@@ -222,17 +186,13 @@ router.post('/forgot-password', async (req, res) => {
 
         res.json({ message: 'E-posta adresiniz kayıtlıysa şifre sıfırlama bağlantısı gönderildi.' });
     } catch (error) {
-        console.error('Forgot password error:', error);
+        logger.error({ err: error }, 'Forgot password error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
 // Reset Password
-router.post('/reset-password', [
-    body('token').notEmpty().withMessage('Token gerekli'),
-    validatePassword,
-    handleValidationErrors
-], async (req, res) => {
+router.post('/reset-password', validate(resetPasswordSchema), async (req, res) => {
     try {
         const { token, password } = req.body;
 
@@ -262,17 +222,13 @@ router.post('/reset-password', [
 
         res.json({ message: 'Şifreniz başarıyla değiştirildi. Giriş yapabilirsiniz.' });
     } catch (error) {
-        console.error('Reset password error:', error);
+        logger.error({ err: error }, 'Reset password error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
 // Login
-router.post('/login', [
-    validateEmail,
-    body('password').notEmpty().withMessage('Şifre gerekli'),
-    handleValidationErrors
-], async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -328,7 +284,7 @@ router.post('/login', [
             }
         });
     } catch (error) {
-        console.error('Login error:', error);
+        logger.error({ err: error }, 'Login error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
@@ -338,10 +294,10 @@ router.get('/google', (req, res) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;
 
-    console.log('[Google OAuth] GET /google - clientId set:', !!clientId);
+    logger.info({ hasClientId: !!clientId }, '[Google OAuth] GET /google');
 
     if (!clientId) {
-        console.error('[Google OAuth] GOOGLE_CLIENT_ID is not set!');
+        logger.error('[Google OAuth] GOOGLE_CLIENT_ID is not set!');
         return res.status(500).json({ message: 'Google OAuth yapılandırılmamış' });
     }
 
@@ -361,28 +317,28 @@ router.get('/google/callback', async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     try {
         const { code, error, state } = req.query;
-        console.log('[Google OAuth] Callback received - hasCode:', !!code, '- hasState:', !!state);
+        logger.info({ hasCode: !!code, hasState: !!state }, '[Google OAuth] Callback received');
 
         if (error || !code) {
-            console.error('[Google OAuth] No code or error from Google:', error);
+            logger.error({ error }, '[Google OAuth] No code or error from Google');
             return res.redirect(`${frontendUrl}/login?error=google_failed`);
         }
 
         // Validate OAuth state (CSRF protection)
         if (!state || !oauthStateStore.has(state)) {
-            console.error('[Google OAuth] Invalid state - state:', state, '- store has:', oauthStateStore.size, 'entries');
+            logger.error({ storeSize: oauthStateStore.size }, '[Google OAuth] Invalid state');
             return res.redirect(`${frontendUrl}/login?error=invalid_state`);
         }
         const stateTimestamp = oauthStateStore.get(state);
         oauthStateStore.delete(state); // One-time use
         if (Date.now() - stateTimestamp > OAUTH_STATE_TTL) {
-            console.error('[Google OAuth] State expired');
+            logger.error('[Google OAuth] State expired');
             return res.redirect(`${frontendUrl}/login?error=state_expired`);
         }
 
         // Exchange code for tokens
         const redirectUri = `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;
-        console.log('[Google OAuth] Exchanging code for token...');
+        logger.info('[Google OAuth] Exchanging code for token...');
 
         const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
             method: 'POST',
@@ -397,10 +353,10 @@ router.get('/google/callback', async (req, res) => {
         });
 
         const tokenData = await tokenResponse.json();
-        console.log('[Google OAuth] Token response status:', tokenResponse.status);
+        logger.info({ status: tokenResponse.status }, '[Google OAuth] Token response');
 
         if (!tokenData.access_token) {
-            console.error('[Google OAuth] Token exchange failed');
+            logger.error('[Google OAuth] Token exchange failed');
             return res.redirect(`${frontendUrl}/login?error=google_failed`);
         }
 
@@ -410,10 +366,10 @@ router.get('/google/callback', async (req, res) => {
         });
 
         const googleUser = await userResponse.json();
-        console.log('[Google OAuth] Google user info received');
+        logger.info('[Google OAuth] Google user info received');
 
         if (!googleUser.email) {
-            console.error('[Google OAuth] No email from Google user info');
+            logger.error('[Google OAuth] No email from Google user info');
             return res.redirect(`${frontendUrl}/login?error=google_failed`);
         }
 
@@ -424,7 +380,7 @@ router.get('/google/callback', async (req, res) => {
 
         if (!user) {
             // Create new user
-            console.log('[Google OAuth] Creating new user');
+            logger.info('[Google OAuth] Creating new user');
             user = await prisma.user.create({
                 data: {
                     email: googleUser.email,
@@ -435,7 +391,7 @@ router.get('/google/callback', async (req, res) => {
             });
         } else if (!user.googleId) {
             // Link Google account to existing user
-            console.log('[Google OAuth] Linking Google to existing user');
+            logger.info('[Google OAuth] Linking Google to existing user');
             user = await prisma.user.update({
                 where: { id: user.id },
                 data: {
@@ -444,7 +400,7 @@ router.get('/google/callback', async (req, res) => {
                 },
             });
         } else {
-            console.log('[Google OAuth] Existing Google user login');
+            logger.info('[Google OAuth] Existing Google user login');
         }
 
         // Generate JWT
@@ -454,7 +410,7 @@ router.get('/google/callback', async (req, res) => {
             { expiresIn: '7d', algorithm: 'HS256' }
         );
 
-        console.log('[Google OAuth] Success! Redirecting to frontend');
+        logger.info('[Google OAuth] Success! Redirecting to frontend');
         // Redirect to frontend with token AND user data
         const userData = encodeURIComponent(JSON.stringify({
             id: user.id,
@@ -470,8 +426,7 @@ router.get('/google/callback', async (req, res) => {
         // Redirect to frontend with token
         res.redirect(`${frontendUrl}/auth/callback?token=${token}&user=${userData}`);
     } catch (error) {
-        console.error('[Google OAuth] Callback error:', error.message || error);
-        console.error('[Google OAuth] Stack:', error.stack);
+        logger.error({ err: error }, '[Google OAuth] Callback error');
         res.redirect(`${frontendUrl}/login?error=google_failed`);
     }
 });

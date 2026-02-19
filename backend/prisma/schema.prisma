@@ -16,7 +16,7 @@ model User {
   isAdmin           Boolean  @default(false)
   onboardingComplete Boolean @default(false)
   currency          String   @default("TRY") // TRY, USD, EUR
-  monthlyBudget     Float?
+  monthlyBudget     Decimal?  @db.Decimal(12, 2)
   language          String   @default("tr") // tr, en
   theme             String   @default("dark") // dark, light
   verificationToken String?  @unique
@@ -46,7 +46,7 @@ model Subscription {
   userId          Int
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   name            String
-  price           Float
+  price           Decimal   @db.Decimal(12, 2)
   currency        String   @default("TRY")
   billingCycle    String   // MONTHLY, YEARLY
   startDate       DateTime
@@ -59,7 +59,7 @@ model Invoice {
   id             Int      @id @default(autoincrement())
   subscriptionId Int
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  amount         Float
+  amount         Decimal   @db.Decimal(12, 2)
   dueDate        DateTime
   status         String   @default("PENDING") // PAID, PENDING, OVERDUE
   paidAt         DateTime?

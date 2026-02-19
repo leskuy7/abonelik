@@ -2,47 +2,8 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
-
-const VALID_BILLING_CYCLES = ['MONTHLY', 'YEARLY'];
-const VALID_CURRENCIES = ['TRY', 'USD', 'EUR'];
-
-// Normalize price: handle Turkish comma format (e.g., "10,50" → 10.50)
-const normalizePrice = (price) => {
-    if (typeof price === 'string') {
-        price = price.replace(',', '.');
-    }
-    return parseFloat(price);
-};
-
-// Validate subscription input (shared between create and update)
-const validateSubscriptionInput = (body) => {
-    const errors = [];
-    const { name, price, currency, billingCycle, startDate } = body;
-
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-        errors.push('Geçerli bir isim girin');
-    }
-
-    const parsedPrice = normalizePrice(price);
-    if (isNaN(parsedPrice) || parsedPrice <= 0) {
-        errors.push('Geçerli bir fiyat girin (0\'dan büyük olmalı)');
-    }
-
-    if (!VALID_BILLING_CYCLES.includes(billingCycle)) {
-        errors.push(`Geçerli bir ödeme sıklığı girin: ${VALID_BILLING_CYCLES.join(', ')}`);
-    }
-
-    if (currency && !VALID_CURRENCIES.includes(currency)) {
-        errors.push(`Geçerli bir para birimi girin: ${VALID_CURRENCIES.join(', ')}`);
-    }
-
-    const parsedDate = new Date(startDate);
-    if (!startDate || isNaN(parsedDate.getTime())) {
-        errors.push('Geçerli bir başlangıç tarihi girin');
-    }
-
-    return { errors, parsedPrice, parsedDate };
-};
+const logger = require('../lib/logger');
+const { subscriptionSchema, validate } = require('../lib/validation');
 
 // Get all subscriptions for logged in user
 router.get('/', auth, async (req, res) => {
@@ -53,22 +14,17 @@ router.get('/', auth, async (req, res) => {
         });
         res.json(subscriptions);
     } catch (err) {
-        console.error(err);
+        logger.error({ err, userId: req.user.userId }, 'Failed to fetch subscriptions');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
 
 // Add new subscription
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, validate(subscriptionSchema), async (req, res) => {
     try {
-        const { errors, parsedPrice, parsedDate } = validateSubscriptionInput(req.body);
-        if (errors.length > 0) {
-            return res.status(400).json({ message: errors[0], errors });
-        }
+        const { name, price, currency, billingCycle, startDate } = req.body;
 
-        const { name, currency, billingCycle } = req.body;
-
-        let nextPayment = new Date(parsedDate);
+        let nextPayment = new Date(startDate);
         if (billingCycle === 'MONTHLY') {
             nextPayment.setMonth(nextPayment.getMonth() + 1);
         } else if (billingCycle === 'YEARLY') {
@@ -78,19 +34,20 @@ router.post('/', auth, async (req, res) => {
         const subscription = await prisma.subscription.create({
             data: {
                 userId: req.user.userId,
-                name: name.trim(),
-                price: parsedPrice,
-                currency: currency || 'TRY',
+                name,
+                price, // Zod already parsed & validated
+                currency,
                 billingCycle,
-                startDate: parsedDate,
+                startDate,
                 nextPaymentDate: nextPayment,
                 status: 'ACTIVE'
             }
         });
 
+        logger.info({ subscriptionId: subscription.id, userId: req.user.userId }, 'Subscription created');
         res.json(subscription);
     } catch (err) {
-        console.error(err);
+        logger.error({ err, userId: req.user.userId }, 'Failed to create subscription');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
@@ -98,30 +55,10 @@ router.post('/', auth, async (req, res) => {
 // Delete subscription
 router.delete('/:id', auth, async (req, res) => {
     try {
-        const subscription = await prisma.subscription.findFirst({
-            where: { id: parseInt(req.params.id), userId: req.user.userId }
-        });
-
-        if (!subscription) {
-            return res.status(404).json({ message: 'Abonelik bulunamadı' });
-        }
-
-        await prisma.subscription.delete({
-            where: { id: parseInt(req.params.id) }
-        });
-
-        res.json({ message: 'Abonelik silindi' });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: 'Sunucu hatası' });
-    }
-});
-
-// Update subscription
-router.put('/:id', auth, async (req, res) => {
-    try {
         const subscriptionId = parseInt(req.params.id);
+        if (isNaN(subscriptionId)) {
+            return res.status(400).json({ message: 'Geçersiz ID' });
+        }
 
         const subscription = await prisma.subscription.findFirst({
             where: { id: subscriptionId, userId: req.user.userId }
@@ -131,14 +68,37 @@ router.put('/:id', auth, async (req, res) => {
             return res.status(404).json({ message: 'Abonelik bulunamadı' });
         }
 
-        const { errors, parsedPrice, parsedDate } = validateSubscriptionInput(req.body);
-        if (errors.length > 0) {
-            return res.status(400).json({ message: errors[0], errors });
+        await prisma.subscription.delete({
+            where: { id: subscriptionId }
+        });
+
+        logger.info({ subscriptionId, userId: req.user.userId }, 'Subscription deleted');
+        res.json({ message: 'Abonelik silindi' });
+    } catch (err) {
+        logger.error({ err, userId: req.user.userId }, 'Failed to delete subscription');
+        res.status(500).json({ message: 'Sunucu hatası' });
+    }
+});
+
+// Update subscription
+router.put('/:id', auth, validate(subscriptionSchema), async (req, res) => {
+    try {
+        const subscriptionId = parseInt(req.params.id);
+        if (isNaN(subscriptionId)) {
+            return res.status(400).json({ message: 'Geçersiz ID' });
         }
 
-        const { name, currency, billingCycle } = req.body;
+        const subscription = await prisma.subscription.findFirst({
+            where: { id: subscriptionId, userId: req.user.userId }
+        });
 
-        let nextPayment = new Date(parsedDate);
+        if (!subscription) {
+            return res.status(404).json({ message: 'Abonelik bulunamadı' });
+        }
+
+        const { name, price, currency, billingCycle, startDate } = req.body;
+
+        let nextPayment = new Date(startDate);
         if (billingCycle === 'MONTHLY') {
             nextPayment.setMonth(nextPayment.getMonth() + 1);
         } else if (billingCycle === 'YEARLY') {
@@ -148,18 +108,19 @@ router.put('/:id', auth, async (req, res) => {
         const updatedSubscription = await prisma.subscription.update({
             where: { id: subscriptionId },
             data: {
-                name: name.trim(),
-                price: parsedPrice,
-                currency: currency || 'TRY',
+                name,
+                price,
+                currency,
                 billingCycle,
-                startDate: parsedDate,
+                startDate,
                 nextPaymentDate: nextPayment
             }
         });
 
+        logger.info({ subscriptionId, userId: req.user.userId }, 'Subscription updated');
         res.json(updatedSubscription);
     } catch (err) {
-        console.error(err);
+        logger.error({ err, userId: req.user.userId }, 'Failed to update subscription');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });

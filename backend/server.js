@@ -6,6 +6,22 @@ const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
+const logger = require('./lib/logger');
+
+// ─── Sentry (optional) ────────────────────────────────────
+let Sentry = null;
+if (process.env.SENTRY_DSN) {
+  Sentry = require('@sentry/node');
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    tracesSampleRate: 0.2, // 20% of transactions for performance monitoring
+    environment: process.env.NODE_ENV || 'development',
+  });
+  logger.info('Sentry initialized');
+} else {
+  logger.warn('SENTRY_DSN not set — Sentry disabled');
+}
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -71,13 +87,18 @@ const emailLimiter = rateLimit({
 app.use(generalLimiter);
 app.use(express.json({ limit: '10kb' })); // JSON payload sınırı
 
-// Request Logger Middleware
+// Request Logger Middleware (structured with Pino)
 app.use((req, res, next) => {
   const start = Date.now();
   const originalEnd = res.end;
   res.end = function (...args) {
     const duration = Date.now() - start;
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`);
+    logger.info({
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      duration: `${duration}ms`,
+    }, 'request');
     originalEnd.apply(res, args);
   };
   next();
@@ -112,7 +133,8 @@ app.get('/api/health', (req, res) => {
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Server error:', err);
+  if (Sentry) Sentry.captureException(err);
+  logger.error({ err, method: req.method, url: req.originalUrl }, 'Unhandled server error');
   res.status(500).json({ message: 'Sunucu hatası oluştu' });
 });
 
@@ -120,7 +142,6 @@ app.use((err, req, res, next) => {
 require('./services/cron')();
 
 app.listen(PORT, () => {
-  console.log(`\n🚀 Server running on port ${PORT}`);
-  console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔒 Security: Helmet, CORS, Rate Limiting enabled\n`);
+  logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, '🚀 Server started');
+  logger.info('🔒 Security: Helmet, CORS, Rate Limiting enabled');
 });

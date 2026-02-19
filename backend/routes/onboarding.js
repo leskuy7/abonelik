@@ -2,50 +2,37 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
-const { body, validationResult } = require('express-validator');
+const logger = require('../lib/logger');
+const { onboardingSchema, validate } = require('../lib/validation');
 
 // Complete Onboarding
-router.post(
-    '/',
-    [
-        auth,
-        [
-            body('currency', 'Geçerli bir para birimi seçiniz').isIn(['TRY', 'USD', 'EUR']),
-            body('monthlyBudget', 'Bütçe sayısal bir değer olmalıdır').optional().isNumeric()
-        ]
-    ],
-    async (req, res) => {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-
+router.post('/', auth, validate(onboardingSchema), async (req, res) => {
+    try {
         const { currency, monthlyBudget } = req.body;
 
-        try {
-            const user = await prisma.user.update({
-                where: { id: req.user.userId },
-                data: {
-                    currency,
-                    monthlyBudget: monthlyBudget ? parseFloat(monthlyBudget) : null,
-                    onboardingComplete: true
-                },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    onboardingComplete: true,
-                    currency: true,
-                    monthlyBudget: true
-                }
-            });
+        const user = await prisma.user.update({
+            where: { id: req.user.userId },
+            data: {
+                currency,
+                monthlyBudget,
+                onboardingComplete: true
+            },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                onboardingComplete: true,
+                currency: true,
+                monthlyBudget: true
+            }
+        });
 
-            res.json(user);
-        } catch (err) {
-            console.error(err.message);
-            res.status(500).json({ message: 'Sunucu hatası' });
-        }
+        logger.info({ userId: req.user.userId, currency }, 'Onboarding completed');
+        res.json(user);
+    } catch (err) {
+        logger.error({ err, userId: req.user.userId }, 'Onboarding failed');
+        res.status(500).json({ message: 'Sunucu hatası' });
     }
-);
+});
 
 module.exports = router;

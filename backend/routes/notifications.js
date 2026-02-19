@@ -3,6 +3,7 @@ const router = express.Router();
 const webpush = require('web-push');
 const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
+const logger = require('../lib/logger');
 
 // Configure web-push
 // Keys are loaded from environment variables
@@ -53,12 +54,12 @@ router.post('/subscribe', auth, async (req, res) => {
         try {
             await webpush.sendNotification(subscription, payload);
         } catch (error) {
-            console.error('Error sending welcome notification:', error);
+            logger.error({ err: error }, 'Error sending welcome notification');
             // Don't fail the request if sending fails, subscription is saved
         }
 
     } catch (error) {
-        console.error('Subscription error:', error);
+        logger.error({ err: error }, 'Push subscription error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
 });
