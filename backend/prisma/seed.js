@@ -4,6 +4,19 @@ const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('Seeding is disabled in production.');
+    }
+
+    const adminEmail = process.env.SEED_ADMIN_EMAIL;
+    const adminPasswordPlain = process.env.SEED_ADMIN_PASSWORD;
+    const userEmail = process.env.SEED_USER_EMAIL;
+    const userPasswordPlain = process.env.SEED_USER_PASSWORD;
+
+    if (!adminEmail || !adminPasswordPlain || !userEmail || !userPasswordPlain) {
+        throw new Error('Missing seed env vars: SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD, SEED_USER_EMAIL, SEED_USER_PASSWORD');
+    }
+
     console.log('🗑️  Tüm kullanıcılar siliniyor...');
 
     // Delete all data in order (respect foreign keys)
@@ -15,10 +28,10 @@ async function main() {
     console.log('✅ Tüm veriler silindi');
 
     // Create admin user
-    const adminPassword = await bcrypt.hash('admin123', 12);
+    const adminPassword = await bcrypt.hash(adminPasswordPlain, 12);
     const admin = await prisma.user.create({
         data: {
-            email: 'admin@subtrack.com',
+            email: adminEmail,
             password: adminPassword,
             name: 'Admin',
             isAdmin: true,
@@ -30,13 +43,13 @@ async function main() {
             monthlyBudget: 500,
         },
     });
-    console.log('👑 Admin oluşturuldu:', admin.email, '(şifre: admin123)');
+    console.log('👑 Admin oluşturuldu:', admin.email);
 
     // Create regular user
-    const userPassword = await bcrypt.hash('user123', 12);
+    const userPassword = await bcrypt.hash(userPasswordPlain, 12);
     const user = await prisma.user.create({
         data: {
-            email: 'user@subtrack.com',
+            email: userEmail,
             password: userPassword,
             name: 'Test Kullanıcı',
             isAdmin: false,
@@ -48,7 +61,7 @@ async function main() {
             monthlyBudget: 200,
         },
     });
-    console.log('👤 Kullanıcı oluşturuldu:', user.email, '(şifre: user123)');
+    console.log('👤 Kullanıcı oluşturuldu:', user.email);
 
     // Add sample subscriptions for the regular user
     const now = new Date();
@@ -92,8 +105,8 @@ async function main() {
 
     console.log('\n🎉 Seed tamamlandı!');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('👑 Admin: admin@subtrack.com / admin123');
-    console.log('👤 User:  user@subtrack.com / user123');
+    console.log('👑 Admin:', admin.email);
+    console.log('👤 User:', user.email);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 }
 

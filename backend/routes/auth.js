@@ -8,6 +8,28 @@ const logger = require('../lib/logger');
 const { sendVerificationEmail, sendWelcomeEmail } = require('../services/email');
 const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, resendVerificationSchema, validate } = require('../lib/validation');
 
+const isProd = process.env.NODE_ENV === 'production';
+
+const getAuthCookieOptions = () => ({
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
+});
+
+const getUserPayload = (user) => ({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    currency: user.currency,
+    monthlyBudget: user.monthlyBudget,
+    language: user.language,
+    theme: user.theme,
+    onboardingComplete: user.onboardingComplete,
+    isAdmin: user.isAdmin,
+});
+
 // In-memory OAuth state store with TTL (10 minutes)
 const oauthStateStore = new Map();
 const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
@@ -269,24 +291,24 @@ router.post('/login', validate(loginSchema), async (req, res) => {
             { expiresIn: '7d', algorithm: 'HS256' }
         );
 
+        res.cookie('auth_token', token, getAuthCookieOptions());
+
         res.json({
-            token,
-            user: {
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                currency: user.currency,
-                monthlyBudget: user.monthlyBudget,
-                language: user.language,
-                theme: user.theme,
-                onboardingComplete: user.onboardingComplete,
-                isAdmin: user.isAdmin
-            }
+            user: getUserPayload(user)
         });
     } catch (error) {
         logger.error({ err: error }, 'Login error');
         res.status(500).json({ message: 'Sunucu hatası' });
     }
+});
+
+// Logout
+router.post('/logout', (req, res) => {
+    res.clearCookie('auth_token', {
+        ...getAuthCookieOptions(),
+        maxAge: 0,
+    });
+    res.json({ message: 'Çıkış yapıldı' });
 });
 
 // Google OAuth - Get URL
@@ -411,20 +433,8 @@ router.get('/google/callback', async (req, res) => {
         );
 
         logger.info('[Google OAuth] Success! Redirecting to frontend');
-        // Redirect to frontend with token AND user data
-        const userData = encodeURIComponent(JSON.stringify({
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            currency: user.currency || 'TRY',
-            monthlyBudget: user.monthlyBudget,
-            language: user.language || 'tr',
-            theme: user.theme || 'dark',
-            onboardingComplete: user.onboardingComplete || false,
-            isAdmin: user.isAdmin || false,
-        }));
-        // Redirect to frontend with token
-        res.redirect(`${frontendUrl}/auth/callback?token=${token}&user=${userData}`);
+        res.cookie('auth_token', token, getAuthCookieOptions());
+        res.redirect(`${frontendUrl}/auth/callback`);
     } catch (error) {
         logger.error({ err: error }, '[Google OAuth] Callback error');
         res.redirect(`${frontendUrl}/login?error=google_failed`);

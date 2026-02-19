@@ -27,9 +27,11 @@ npm run dev
 Frontend **http://localhost:3000** (veya 3001) adresinde çalışacaktır.
 
 ## Test Kullanıcısı
-Geliştirme aşamasında hızlı test için aşağıdaki kullanıcı tanımlanmıştır:
-- **Email:** testuser@example.com
-- **Şifre:** password123
+Geliştirme ortamında seed kullanmak isterseniz `backend/prisma/seed.js` dosyası sadece dev ortamında çalışır. Gerekli ortam değişkenleri:
+- `SEED_ADMIN_EMAIL`
+- `SEED_ADMIN_PASSWORD`
+- `SEED_USER_EMAIL`
+- `SEED_USER_PASSWORD`
 
 ## Notlar
 - **PWA (Progressive Web App):** Uygulama telefonunuza yüklenebilir özelliktedir. Geliştirme ortamında (`npm run dev`) PWA özellikleri bazen hata verebilir, bu durumda production build (`npm run build && npm start`) kullanılması önerilir.

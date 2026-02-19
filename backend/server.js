@@ -3,6 +3,7 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser');
 
 dotenv.config();
 
@@ -86,6 +87,7 @@ const emailLimiter = rateLimit({
 
 app.use(generalLimiter);
 app.use(express.json({ limit: '10kb' })); // JSON payload sınırı
+app.use(cookieParser());
 
 // Request Logger Middleware (structured with Pino)
 app.use((req, res, next) => {

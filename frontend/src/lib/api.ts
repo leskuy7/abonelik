@@ -5,30 +5,14 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    withCredentials: true,
 });
-
-// Add a request interceptor
-api.interceptors.request.use(
-    (config) => {
-        const token = localStorage.getItem('token');
-        if (token) {
-            config.headers['x-auth-token'] = token;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
 
 // Add a response interceptor — auto-logout on 401
 api.interceptors.response.use(
     (response) => response,
     (error) => {
         if (error.response?.status === 401) {
-            // Token expired or invalid — clear auth state and redirect
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
             // Only redirect if not already on login/register page
             if (typeof window !== 'undefined' &&
                 !window.location.pathname.includes('/login') &&

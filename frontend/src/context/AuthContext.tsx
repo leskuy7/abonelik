@@ -17,7 +17,7 @@ interface User {
 interface AuthContextType {
     user: User | null;
     loading: boolean;
-    login: (token: string, user: User) => void;
+    login: (user: User) => void;
     logout: () => void;
     updateUser: (user: User) => void;
 }
@@ -37,23 +37,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     useEffect(() => {
         const loadUser = async () => {
-            const token = localStorage.getItem('token');
-            const savedUser = localStorage.getItem('user');
-
-            if (token && savedUser) {
-                try {
-                    // Validate token by fetching fresh user data from backend
-                    const response = await api.get('/users/profile');
-                    setUser(response.data);
-                    // Update stored user with fresh data
-                    localStorage.setItem('user', JSON.stringify(response.data));
-                } catch (err) {
-                    // Token is invalid/expired — clear everything
-                    console.warn('[Auth] Token validation failed, logging out');
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    setUser(null);
-                }
+            try {
+                const response = await api.get('/users/profile');
+                setUser(response.data);
+            } catch {
+                setUser(null);
             }
             setLoading(false);
         };
@@ -61,9 +49,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         loadUser();
     }, []);
 
-    const login = useCallback((token: string, userData: User) => {
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
+    const login = useCallback((userData: User) => {
         setUser(userData);
 
         if (!userData.onboardingComplete) {
@@ -74,14 +60,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }, [router]);
 
     const updateUser = useCallback((userData: User) => {
-        localStorage.setItem('user', JSON.stringify(userData));
         setUser(userData);
     }, []);
 
     const logout = useCallback(() => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        sessionStorage.clear(); // Clear session-specific data
+        api.post('/auth/logout').catch(() => null);
+        sessionStorage.clear();
         setUser(null);
         router.push('/login');
     }, [router]);

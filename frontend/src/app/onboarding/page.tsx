@@ -26,10 +26,7 @@ export default function OnboardingPage() {
 
             if (user) {
                 const updatedUser = { ...user, ...res.data };
-                const token = localStorage.getItem('token');
-                if (token) {
-                    login(token, updatedUser);
-                }
+                login(updatedUser);
             }
         } catch (error) {
             console.error('Onboarding error:', error);

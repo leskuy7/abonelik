@@ -1,6 +1,5 @@
 const express = require('express');
 const router = express.Router();
-const bcrypt = require('bcryptjs');
 const prisma = require('../lib/prisma');
 const auth = require('../middleware/auth');
 const logger = require('../lib/logger');
@@ -146,115 +145,6 @@ router.get('/stats', auth, adminOnly, async (req, res) => {
     } catch (error) {
         logger.error({ err: error }, 'Admin route error');
         res.status(500).json({ message: 'Sunucu hatası' });
-    }
-});
-
-// Seed database (protected by secret key - one-time use)
-router.post('/seed', async (req, res) => {
-    try {
-        const { secretKey } = req.body;
-
-        // Protect with a secret key (not auth - since we're resetting users)
-        if (secretKey !== 'subtrack-seed-2026') {
-            return res.status(403).json({ message: 'Geçersiz anahtar' });
-        }
-
-        logger.info('[Admin Seed] Starting database reset...');
-
-        // Delete all data in order (respect foreign keys)
-        await prisma.invoice.deleteMany({});
-        await prisma.subscription.deleteMany({});
-        await prisma.pushSubscription.deleteMany({});
-        await prisma.user.deleteMany({});
-
-        logger.info('[Admin Seed] All data deleted');
-
-        // Create admin user
-        const adminPassword = await bcrypt.hash('admin123', 12);
-        const admin = await prisma.user.create({
-            data: {
-                email: 'admin@subtrack.com',
-                password: adminPassword,
-                name: 'Admin',
-                isAdmin: true,
-                isEmailVerified: true,
-                onboardingComplete: true,
-                currency: 'TRY',
-                language: 'tr',
-                theme: 'dark',
-                monthlyBudget: 500,
-            },
-        });
-
-        // Create regular user
-        const userPassword = await bcrypt.hash('user123', 12);
-        const user = await prisma.user.create({
-            data: {
-                email: 'user@subtrack.com',
-                password: userPassword,
-                name: 'Test Kullanıcı',
-                isAdmin: false,
-                isEmailVerified: true,
-                onboardingComplete: true,
-                currency: 'TRY',
-                language: 'tr',
-                theme: 'dark',
-                monthlyBudget: 200,
-            },
-        });
-
-        // Add sample subscriptions for the regular user
-        const now = new Date();
-        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
-
-        await prisma.subscription.createMany({
-            data: [
-                {
-                    userId: user.id,
-                    name: 'Netflix',
-                    price: 149.99,
-                    currency: 'TRY',
-                    billingCycle: 'MONTHLY',
-                    startDate: new Date('2024-06-01'),
-                    nextPaymentDate: nextMonth,
-                    status: 'ACTIVE',
-                },
-                {
-                    userId: user.id,
-                    name: 'Spotify',
-                    price: 59.99,
-                    currency: 'TRY',
-                    billingCycle: 'MONTHLY',
-                    startDate: new Date('2024-03-15'),
-                    nextPaymentDate: nextMonth,
-                    status: 'ACTIVE',
-                },
-                {
-                    userId: user.id,
-                    name: 'YouTube Premium',
-                    price: 79.99,
-                    currency: 'TRY',
-                    billingCycle: 'MONTHLY',
-                    startDate: new Date('2024-01-01'),
-                    nextPaymentDate: nextMonth,
-                    status: 'ACTIVE',
-                },
-            ],
-        });
-
-        logger.info('[Admin Seed] Seed completed successfully');
-
-        res.json({
-            message: 'Veritabanı sıfırlandı ve hazır hesaplar oluşturuldu',
-            accounts: [
-                { role: 'Admin', email: 'admin@subtrack.com', password: 'admin123' },
-                { role: 'User', email: 'user@subtrack.com', password: 'user123' },
-            ],
-            subscriptions: ['Netflix (₺149.99)', 'Spotify (₺59.99)', 'YouTube Premium (₺79.99)'],
-        });
-    } catch (error) {
-        logger.error({ err: error }, '[Admin Seed] Error');
-        res.status(500).json({ message: 'Seed başarısız: ' + error.message });
     }
 });
 

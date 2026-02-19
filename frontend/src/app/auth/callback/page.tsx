@@ -18,8 +18,6 @@ function AuthCallbackContent() {
         if (processedRef.current) return;
         processedRef.current = true;
 
-        const token = searchParams.get('token');
-        const userParam = searchParams.get('user');
         const errorParam = searchParams.get('error');
 
         if (errorParam) {
@@ -27,39 +25,16 @@ function AuthCallbackContent() {
             return;
         }
 
-        if (!token) {
-            router.replace('/login?error=missing_params');
-            return;
-        }
-
-        // Parse user data synchronously — no need for async/await here
-        let userData = null;
-        if (userParam) {
-            try {
-                userData = JSON.parse(decodeURIComponent(userParam));
-            } catch (e) {
-                // If parse fails, we'll fetch from API
-            }
-        }
-
-        if (userData) {
-            // Fast path: user data is in URL, login immediately
-            login(token, userData);
-        } else {
-            // Slow path: fetch user data from API
-            localStorage.setItem('token', token);
-            api.get('/users/profile')
-                .then((response) => {
-                    login(token, response.data);
-                })
-                .catch(() => {
-                    localStorage.removeItem('token');
-                    setError('Giriş işlemi başarısız oldu. Lütfen tekrar deneyin.');
-                    setTimeout(() => {
-                        router.replace('/login?error=auth_callback_failed');
-                    }, 2000);
-                });
-        }
+        api.get('/users/profile')
+            .then((response) => {
+                login(response.data);
+            })
+            .catch(() => {
+                setError('Giriş işlemi başarısız oldu. Lütfen tekrar deneyin.');
+                setTimeout(() => {
+                    router.replace('/login?error=auth_callback_failed');
+                }, 2000);
+            });
     }, []); // Empty dependency — run once on mount
 
     return (

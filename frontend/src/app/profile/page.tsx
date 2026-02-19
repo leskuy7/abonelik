@@ -52,8 +52,7 @@ export default function ProfilePage() {
             });
 
             // Update local user context
-            const token = localStorage.getItem('token');
-            if (token && user) {
+            if (user) {
                 const updatedUser = { ...user, ...res.data };
                 updateUser(updatedUser);
             }
