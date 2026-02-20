@@ -12,6 +12,7 @@ import { useSettings } from '@/context/SettingsContext';
 function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [rememberMe, setRememberMe] = useState(false);
     const { user, loading: authLoading, login } = useAuth();
     const { t } = useSettings();
     const [error, setError] = useState('');
@@ -57,7 +58,7 @@ function LoginPage() {
         setNeedsVerification(false);
 
         try {
-            const res = await api.post('/auth/login', { email, password });
+            const res = await api.post('/auth/login', { email, password, rememberMe });
             login(res.data.user);
         } catch (err: any) {
             if (err.response?.data?.requiresVerification) {
@@ -228,6 +229,20 @@ function LoginPage() {
                                 </button>
                             </div>
                         </div>
+
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                id="rememberMe"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                                className="w-4 h-4 text-purple-600 bg-input border-default rounded focus:ring-purple-500 cursor-pointer"
+                            />
+                            <label htmlFor="rememberMe" className="text-sm text-muted cursor-pointer select-none">
+                                {t.rememberMe || 'Oturumu açık tut'}
+                            </label>
+                        </div>
+
                         <button
                             type="submit"
                             disabled={loading}

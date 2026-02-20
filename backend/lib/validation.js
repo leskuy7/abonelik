@@ -28,6 +28,7 @@ const subscriptionSchema = z.object({
 const loginSchema = z.object({
     email: z.string().email('Geçerli bir e-posta adresi girin').max(255, 'E-posta çok uzun').toLowerCase().trim(),
     password: z.string().min(1, 'Şifre gerekli').max(100, 'Şifre çok uzun'),
+    rememberMe: z.boolean().optional(),
 });
 
 const registerSchema = z.object({

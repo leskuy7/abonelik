@@ -10,11 +10,11 @@ const { registerSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, 
 
 const isProd = process.env.NODE_ENV === 'production';
 
-const getAuthCookieOptions = () => ({
+const getAuthCookieOptions = (rememberMe = false) => ({
     httpOnly: true,
     sameSite: isProd ? 'none' : 'lax',
     secure: isProd,
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    ...(rememberMe ? { maxAge: 30 * 24 * 60 * 60 * 1000 } : {}),
     path: '/',
 });
 
@@ -252,7 +252,7 @@ router.post('/reset-password', validate(resetPasswordSchema), async (req, res) =
 // Login
 router.post('/login', validate(loginSchema), async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, rememberMe } = req.body;
 
         // Check user
         const user = await prisma.user.findUnique({
@@ -288,10 +288,10 @@ router.post('/login', validate(loginSchema), async (req, res) => {
         const token = jwt.sign(
             { userId: user.id },
             process.env.JWT_SECRET,
-            { expiresIn: '7d', algorithm: 'HS256' }
+            { expiresIn: rememberMe ? '30d' : '1d', algorithm: 'HS256' }
         );
 
-        res.cookie('auth_token', token, getAuthCookieOptions());
+        res.cookie('auth_token', token, getAuthCookieOptions(rememberMe));
 
         res.json({
             user: getUserPayload(user)
