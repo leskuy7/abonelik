@@ -1,16 +1,46 @@
 const cron = require('node-cron');
-const nodemailer = require('nodemailer');
 const prisma = require('../lib/prisma');
 const logger = require('../lib/logger');
 
-// Email transporter
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-});
+// Send email using Resend REST API (HTTP) to bypass Render SMTP blocks
+const sendEmailToResend = async (mailOptions) => {
+    const apiKey = process.env.RESEND_API_KEY;
+
+    // In development mode without API key, just log to console
+    if (!apiKey || apiKey === 'your_resend_api_key_here') {
+        logger.info({ to: mailOptions.to, subject: mailOptions.subject }, 'DEV MODE: Email (not sent)');
+        return true;
+    }
+
+    try {
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from: process.env.EMAIL_USER || 'onboarding@resend.dev', // Must be an allowed domain in Resend
+                to: mailOptions.to,
+                subject: mailOptions.subject,
+                text: mailOptions.text
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            logger.error({ err: errorData, to: mailOptions.to }, 'Resend API Error');
+            return false;
+        }
+
+        const data = await response.json();
+        logger.info({ to: mailOptions.to, id: data.id }, 'Email sent successfully via Resend');
+        return true;
+    } catch (error) {
+        logger.error({ err: error, to: mailOptions.to }, 'Error calling Resend API');
+        return false;
+    }
+};
 
 // ─── Renewal Worker ────────────────────────────────────────
 // Processes overdue subscriptions: creates invoices and advances nextPaymentDate
@@ -122,22 +152,13 @@ const checkUpcomingPayments = async () => {
 
         for (const sub of subscriptions) {
             const mailOptions = {
-                from: process.env.EMAIL_USER,
+                from: process.env.EMAIL_USER || 'onboarding@resend.dev',
                 to: sub.user.email,
                 subject: `Yaklaşan Ödeme: ${sub.name}`,
                 text: `Merhaba ${sub.user.name || 'Kullanıcı'},\n\n${sub.name} aboneliğinizin ödeme tarihi ${sub.nextPaymentDate.toLocaleDateString('tr-TR')} tarihinde.\nTutar: ${Number(sub.price)} ${sub.currency}\n\nSubTrack`
             };
 
-            if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-                try {
-                    await transporter.sendMail(mailOptions);
-                    logger.info({ to: sub.user.email, subscription: sub.name }, 'Reminder email sent');
-                } catch (emailErr) {
-                    logger.error({ err: emailErr, to: sub.user.email }, 'Failed to send reminder email');
-                }
-            } else {
-                logger.debug({ to: sub.user.email }, 'Mock reminder email (no email config)');
-            }
+            await sendEmailToResend(mailOptions);
         }
     } catch (error) {
         logger.error({ err: error }, 'Payment reminder job failed');
